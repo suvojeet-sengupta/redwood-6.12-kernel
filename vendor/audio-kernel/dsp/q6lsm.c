@@ -668,19 +668,53 @@ static int q6lsm_set_params_v3(struct lsm_client *client,
 			       uint8_t *param_data, uint32_t param_size)
 {
 	struct lsm_session_cmd_set_params_v3 *lsm_set_param = NULL;
-	uint32_t pkt_size = 0;
+	size_t hdr_size;
+	size_t pkt_size;
 	int ret = 0;
 
-	pkt_size = sizeof(struct lsm_session_cmd_set_params_v3);
-	pr_debug("%s param_size = %u, pkt_size = %u \n", __func__, param_size, pkt_size);
+	 /*
+	 * Exactly one representation must be supplied:
+	 *
+	 *   mem_hdr   != NULL, param_data == NULL: out-of-band
+	 *   mem_hdr   == NULL, param_data != NULL: in-band
+	 */
+	if ((mem_hdr != NULL) == (param_data != NULL)) {
+		pr_err("%s: invalid data representation: mem_hdr=%pK "
+			"param_data=%pK\n",
+			__func__, mem_hdr, param_data);
+		return -EINVAL;
+	}
+	hdr_size = offsetof(struct lsm_session_cmd_set_params_v3,
+				param_data);
+	pr_debug("%s hdr_size = %zu \n", __func__, hdr_size);
+
+	/*
+	* The protocol carries u32 parameter data.
+	*/
+	if (!IS_ALIGNED(param_size, sizeof(u32))) {
+		pr_err("%s: unaligned param_size=%u\n",
+			__func__, param_size);
+		return -EINVAL;
+	}
+
+	pkt_size = hdr_size;
+	pr_debug("%s param_size = %u, pkt_size = %zu, sizeof(set_param_v3): %zu \n",
+		__func__, param_size, pkt_size, sizeof(struct lsm_session_cmd_set_params_v3));
 	if (param_size > (U32_MAX - pkt_size)) {
 		pr_err("%s: param_size %u too large\n", __func__, param_size);
 		return -EINVAL;
 	}
 
-	/* Only include param size in packet size when inband */
-	if (param_data != NULL)
+	/*
+	* Only in-band data is physically appended to the APR packet.
+	*/
+	if (param_data != NULL) {
+		if (param_size > SIZE_MAX - pkt_size) {
+			pr_err("%s: param_size %u overflow !\n", __func__, param_size);
+			return -EOVERFLOW;
+		}
 		pkt_size += param_size;
+	}
 
 	lsm_set_param = kzalloc(pkt_size, GFP_KERNEL);
 	if (!lsm_set_param)
@@ -690,21 +724,18 @@ static int q6lsm_set_params_v3(struct lsm_client *client,
 	lsm_set_param->apr_hdr.opcode = LSM_SESSION_CMD_SET_PARAMS_V3;
 	lsm_set_param->payload_size = param_size;
 
+
+	pr_debug("%s: client=%pK mem_hdr=%pK param_data=%pK "
+		"param_size=%u hdr_size=%zu pkt_size=%zu\n",
+	       __func__, client, mem_hdr, param_data, param_size, hdr_size, pkt_size);
 	if (mem_hdr != NULL) {
 		lsm_set_param->mem_hdr = *mem_hdr;
-	} else if (param_data != NULL) {
-		pr_err("%s param_size  = %d",__func__, param_size);
-		memcpy(lsm_set_param->param_data, param_data, param_size);
 	} else {
-		pr_err("%s: Received NULL pointers for both memory header and data\n",
-		       __func__);
-		ret = -EINVAL;
-		goto done;
+		memcpy(lsm_set_param->param_data, param_data, param_size);
 	}
 
 	ret = q6lsm_apr_send_pkt(client, client->apr, lsm_set_param, true,
 				 NULL);
-done:
 	kfree(lsm_set_param);
 	return ret;
 }
