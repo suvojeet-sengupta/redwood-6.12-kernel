@@ -14,6 +14,7 @@ changes applied. Device tree work, bring-up tools and notes live in
 | `vendor/graphics-kernel` | `gfx-kernel.lnx.16.0.r14-rel` |
 | `vendor/graphics-devicetree` | `gfx-devicetree-oss.lnx.16.0.r8-rel` |
 | `vendor/securemsm-kernel`, `vendor/wlan/*`, `vendor/dataipa`, `vendor/datarmnet*` | `LA.VENDOR.16.2.8.r1-06100-LAHAINA.0` |
+| `vendor/audio-kernel` | `audio-kernel-legacy.lnx.6.12.r1-rel` |
 | `vendor/camera-kernel` | `camera-iot-kernel.qclinux.1.1.r5-rel` |
 | `vendor/redwood-modules` | redwood's own modules (usbrole, touch, subsys_compat, Wi-Fi build scripts) |
 

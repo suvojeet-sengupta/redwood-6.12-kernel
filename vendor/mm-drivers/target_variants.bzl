@@ -4,6 +4,7 @@ targets = [
     "bengal",
     "canoe",
     "gen3auto",
+    "lahaina",
     "parrot",
     "seraph",
     "sun",
