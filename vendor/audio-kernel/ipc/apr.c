@@ -69,6 +69,7 @@ struct apr_private {
 	struct device *dev;
 	spinlock_t apr_lock;
 	bool is_initial_boot;
+	bool is_audio_pd_up;
 	struct work_struct add_chld_dev_work;
 };
 
@@ -282,7 +283,6 @@ EXPORT_SYMBOL(apr_get_q6_state);
 
 int apr_set_q6_state(enum apr_subsys_state state)
 {
-	pr_debug("%s: setting adsp state %d\n", __func__, state);
 	if (state < APR_SUBSYS_DOWN || state > APR_SUBSYS_LOADED)
 		return -EINVAL;
 	atomic_set(&q6.q6_state, state);
@@ -325,7 +325,7 @@ static void apr_add_child_devices(struct work_struct *work)
 static void apr_adsp_up(void)
 {
 	if (apr_get_q6_state() != APR_SUBSYS_LOADED) {
-		pr_err("%s: Q6 is Up\n", __func__);
+		pr_info("%s: Q6 is Up\n", __func__);
 		dev_info(apr_priv->dev, "M - ADSP Ready\n");
 		apr_set_q6_state(APR_SUBSYS_LOADED);
 
@@ -383,6 +383,17 @@ int apr_send_pkt(void *handle, uint32_t *buf)
 		   (apr_get_modem_state() == APR_SUBSYS_DOWN)) {
 		pr_err("apr: Still Modem is not Up\n");
 		return -ENETRESET;
+	} else if ((svc->dest_id == APR_DEST_QDSP6) &&
+		(apr_get_q6_state() == APR_SUBSYS_LOADED)) {
+		bool pd_up;
+		spin_lock(&apr_priv->apr_lock);
+		pd_up = apr_priv->is_audio_pd_up;
+		spin_unlock(&apr_priv->apr_lock);
+		if (!pd_up) {
+			if (__ratelimit(&rtl))
+				pr_err("%s:Q6 is up, but audio PD service not Up\n", __func__);
+			return -ENETRESET;
+		}
 	}
 
 	spin_lock_irqsave(&svc->w_lock, flags);
@@ -521,6 +532,7 @@ struct apr_svc *apr_register(char *dest, char *svc_name, apr_fn svc_fn,
 	dest_id = apr_get_dest_id(dest);
 
 	if (dest_id == APR_DEST_QDSP6) {
+
 		if (apr_get_q6_state() != APR_SUBSYS_LOADED) {
 			int rt;
 
@@ -533,15 +545,14 @@ struct apr_svc *apr_register(char *dest, char *svc_name, apr_fn svc_fn,
 				pr_err("%s: adsp not up rproc is NULL\n", __func__);
 				return NULL;
 			} else {
-				pr_err("%s:adsp rproc booted up \n", __func__);
-				//apr_adsp_up();
+				apr_adsp_up();
 				spin_lock(&apr_priv->apr_lock);
 				apr_priv->is_initial_boot = false;
 				spin_unlock(&apr_priv->apr_lock);
 				apr_reg_initial_bootup = false;
 			}
 		}
-		pr_debug("%s: adsp booted Up\n", __func__);
+		pr_debug("%s: adsp Up\n", __func__);
 	} else if (dest_id == APR_DEST_MODEM) {
 		if (apr_get_modem_state() == APR_SUBSYS_DOWN) {
 			if (is_modem_up) {
@@ -1122,15 +1133,21 @@ static int apr_notifier_service_cb(struct notifier_block *this,
 		spin_unlock(&apr_priv->apr_lock);
 		if (cb_data->domain == AUDIO_NOTIFIER_MODEM_DOMAIN)
 			apr_modem_down(opcode);
-		else
+		else {
 			apr_adsp_down(opcode);
+			apr_priv->is_audio_pd_up = false;
+		}
 		break;
 	case AUDIO_NOTIFIER_SERVICE_UP:
-		pr_err("%s Inside AUDIO_NOTIFIER_SERVICE_UP \n",__func__);
+		pr_debug("APR_TRACE: AUDIO_NOTIFIER_SERVICE_UP received, "
+			"domain=%d q6_state=%d\n",
+			cb_data->domain, apr_get_q6_state());
 		if (cb_data->domain == AUDIO_NOTIFIER_MODEM_DOMAIN)
 			apr_modem_up();
 		else {
-			pr_err("%s AUDIO_NOTIFIER_SERVICE_UP:, caling apr_adsp_up()\n",__func__);
+			pr_debug("APR_TRACE: audio_pd is up()\n");
+			apr_priv->is_audio_pd_up = true;
+			// Update Q6 state up
 			apr_adsp_up();
 		}
 		spin_lock(&apr_priv->apr_lock);
@@ -1259,7 +1276,6 @@ static int apr_probe(struct platform_device *pdev)
 	}
 
 	if (!strcmp(subsys_name, "apr_adsp")) {
-		pr_err("%s subsys_notif_register: apr_adsp AUDIO_NOTIFIER_ADSP_DOMAIN\n",__func__);
 		subsys_notif_register("apr_adsp",
 				       AUDIO_NOTIFIER_ADSP_DOMAIN,
 				       &adsp_service_nb);
