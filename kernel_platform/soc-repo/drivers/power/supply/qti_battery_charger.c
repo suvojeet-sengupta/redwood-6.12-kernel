@@ -301,6 +301,7 @@ struct battery_charger_config {
 };
 
 struct battery_chg_dev {
+	bool				xiaomi_batt_props;
 	struct device			*dev;
 	struct class			battery_class;
 	struct pmic_glink_client	*client;
@@ -528,10 +529,43 @@ static int battery_chg_write(struct battery_chg_dev *bcdev, void *data,
 	return rc;
 }
 
+/*
+ * Xiaomi's charger firmware has BATT_CONSTANT_CURRENT right before
+ * BATT_TEMP and stops at BATT_POWER_AVG, so its battery property ids from
+ * BATT_TEMP on are one higher than ours and the ones after BATT_POWER_AVG
+ * don't exist.
+ */
+static bool batt_prop_fw_id(struct battery_chg_dev *bcdev,
+			    struct psy_state *pst, u32 *prop_id)
+{
+	if (!bcdev->xiaomi_batt_props ||
+	    pst != &bcdev->psy_list[PSY_TYPE_BATTERY])
+		return true;
+	if (*prop_id > BATT_POWER_AVG)
+		return false;
+	if (*prop_id >= BATT_TEMP)
+		(*prop_id)++;
+	return true;
+}
+
+static bool batt_prop_from_fw_id(struct battery_chg_dev *bcdev, u32 *prop_id)
+{
+	if (!bcdev->xiaomi_batt_props)
+		return true;
+	if (*prop_id == BATT_TEMP)
+		return false;
+	if (*prop_id > BATT_TEMP)
+		(*prop_id)--;
+	return true;
+}
+
 static int write_property_id(struct battery_chg_dev *bcdev,
 			struct psy_state *pst, u32 prop_id, u32 val)
 {
 	struct battery_charger_req_msg req_msg = { { 0 } };
+
+	if (!batt_prop_fw_id(bcdev, pst, &prop_id))
+		return -ENODATA;
 
 	req_msg.property_id = prop_id;
 	req_msg.battery_id = 0;
@@ -551,6 +585,9 @@ static int read_property_id(struct battery_chg_dev *bcdev,
 			struct psy_state *pst, u32 prop_id)
 {
 	struct battery_charger_req_msg req_msg = { { 0 } };
+
+	if (!batt_prop_fw_id(bcdev, pst, &prop_id))
+		return -ENODATA;
 
 	req_msg.property_id = prop_id;
 	req_msg.battery_id = 0;
@@ -773,6 +810,7 @@ static void handle_message(struct battery_chg_dev *bcdev, void *data,
 
 		/* Other response should be of same type as they've u32 value */
 		if (validate_message(bcdev, resp_msg, len) &&
+		    batt_prop_from_fw_id(bcdev, &resp_msg->property_id) &&
 		    resp_msg->property_id < pst->prop_count) {
 			pst->prop[resp_msg->property_id] = resp_msg->value;
 			ack_set = true;
@@ -2700,6 +2738,9 @@ static int battery_chg_parse_dt(struct battery_chg_dev *bcdev)
 
 	bcdev->wls_not_supported = of_property_read_bool(node,
 			"qcom,wireless-charging-not-supported");
+
+	bcdev->xiaomi_batt_props = of_property_read_bool(node,
+			"qcom,xiaomi-battery-props");
 
 	of_property_read_string(node, "qcom,wireless-fw-name",
 				&bcdev->wls_fw_name);
