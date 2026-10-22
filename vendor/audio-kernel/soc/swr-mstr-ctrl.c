@@ -947,9 +947,9 @@ static void swrm_wait_for_fifo_avail(struct swr_mstr_ctrl *swrm, int swrm_rd_wr)
 {
 	u32 fifo_outstanding_cmd;
 	u32 fifo_retry_count = SWR_OVERFLOW_RETRY_COUNT;
-
-	if (!swrm->dev_up) {
-        	return;
+	if (!READ_ONCE(swrm->dev_up)) {
+		pr_debug("%s  swrm->dev_up not up , return \n",__func__);
+		return;
 	}
 	if (swrm_rd_wr) {
 		/* Check for fifo underflow during read */
@@ -4339,7 +4339,7 @@ int swrm_wcd_notify(struct platform_device *pdev, u32 id, void *data)
 		dev_dbg(swrm->dev, "%s: swr master down called\n", __func__);
 		mutex_lock(&swrm->mlock);
 		if (swrm->state == SWR_MSTR_DOWN)
-			dev_err(swrm->dev, "%s:SWR master is already Down:%d\n",
+			dev_dbg(swrm->dev, "%s:SWR master is already Down:%d\n",
 				__func__, swrm->state);
 		else
 			swrm_device_down(&pdev->dev);
