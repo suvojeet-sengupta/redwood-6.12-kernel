@@ -307,6 +307,8 @@ static void apr_adsp_down(unsigned long opcode)
 	dispatch_event(opcode, APR_DEST_QDSP6);
 }
 
+static bool apr_children_added;
+
 static void apr_add_child_devices(struct work_struct *work)
 {
 	int ret;
@@ -316,6 +318,8 @@ static void apr_add_child_devices(struct work_struct *work)
 	if (ret)
 		dev_err(apr_priv->dev, "%s: failed to add child nodes, ret=%d\n",
 			__func__, ret);
+	else
+		apr_children_added = true;
 }
 
 static void apr_adsp_up(void)
@@ -326,7 +330,7 @@ static void apr_adsp_up(void)
 		apr_set_q6_state(APR_SUBSYS_LOADED);
 
 		spin_lock(&apr_priv->apr_lock);
-		if (apr_priv->is_initial_boot)
+		if (!apr_children_added)
 			schedule_work(&apr_priv->add_chld_dev_work);
 		spin_unlock(&apr_priv->apr_lock);
 		snd_event_notify(apr_priv->dev, SND_EVENT_UP);
