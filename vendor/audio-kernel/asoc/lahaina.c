@@ -46,6 +46,13 @@
 #include "lahaina-port-config.h"
 #include "msm_dailink.h"
 #include "msm_common.h"
+
+SND_SOC_DAILINK_DEFS(pri_tdm_rx_0_spkr,
+	DAILINK_COMP_ARRAY(COMP_CPU("msm-dai-q6-tdm.36864")),
+	DAILINK_COMP_ARRAY(COMP_CODEC("msm-stub-codec.1", "msm-stub-rx"),
+			   COMP_CODEC("aw88261-l", "aw88261-aif"),
+			   COMP_CODEC("aw88261-r", "aw88261-aif")),
+	DAILINK_COMP_ARRAY(COMP_PLATFORM("msm-pcm-routing")));
 #include <trace/hooks/sound.h>
 
 #define DRV_NAME "lahaina-asoc-snd"
@@ -6589,7 +6596,7 @@ static struct snd_soc_dai_link msm_common_be_dai_links[] = {
 		.ops = &lahaina_tdm_be_ops,
 		.ignore_suspend = 1,
 		.ignore_pmdown_time = 1,
-		SND_SOC_DAILINK_REG(pri_tdm_rx_0),
+		SND_SOC_DAILINK_REG(pri_tdm_rx_0_spkr),
 	},
 	{
 		.name = LPASS_BE_PRI_TDM_TX_0,
