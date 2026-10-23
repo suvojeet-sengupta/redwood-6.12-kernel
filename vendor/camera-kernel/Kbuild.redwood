@@ -8,7 +8,8 @@ ccflags-y += -DCONFIG_SPECTRA_ICP=1
 ccflags-y += -DCONFIG_SPECTRA_JPEG=1
 ccflags-y += -DCONFIG_SPECTRA_SENSOR=1
 
-ccflags-y += -D__NO_FORTIFY -fstrict-flex-arrays=0 -include $(CAMERA_KERNEL_ROOT)/drivers/cam_generated_h
+ccflags-y += -D__NO_FORTIFY -fstrict-flex-arrays=0
+ccflags-y += -DCAMERA_COMPILE_BY=\"redwood\" -DCAMERA_COMPILE_HOST=\"kbuild\" -DCAMERA_COMPILE_TIME=\"redwood\"
 
 cam_include_dirs := $(shell dirname `find $(CAMERA_KERNEL_ROOT)/drivers $(CAMERA_KERNEL_ROOT)/include -name '*.h'` | sort -u)
 LINUXINCLUDE := -I$(SOC_INCLUDE) $(LINUXINCLUDE) -I$(CAMERA_KERNEL_ROOT)/include/uapi/camera -I$(CAMERA_KERNEL_ROOT)/include/uapi $(addprefix -I,$(cam_include_dirs)) -I$(CAMERA_KERNEL_ROOT)
