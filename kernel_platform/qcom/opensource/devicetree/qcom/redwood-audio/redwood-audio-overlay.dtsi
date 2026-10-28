@@ -124,9 +124,14 @@
 
 &wcd938x_codec {
 	status = "okay";
+	/*
+	 * Lahaina puts TX port 1 (ADC1/ADC2, the main mics) on data lane 1;
+	 * redwood's TX SoundWire only has lane 0, which 5.4 used for every
+	 * port, so the mics recorded silence. Same offsets, all on lane 0.
+	 */
 	qcom,swr-tx-port-params =
-		<OFFSET1_VAL0 LANE1>, <OFFSET1_VAL5 LANE0>, <OFFSET1_VAL1 LANE0>, <OFFSET1_VAL1 LANE0>,
-		<OFFSET1_VAL0 LANE1>, <OFFSET1_VAL2 LANE0>, <OFFSET1_VAL1 LANE0>, <OFFSET1_VAL1 LANE0>,
+		<OFFSET1_VAL0 LANE0>, <OFFSET1_VAL5 LANE0>, <OFFSET1_VAL1 LANE0>, <OFFSET1_VAL1 LANE0>,
+		<OFFSET1_VAL0 LANE0>, <OFFSET1_VAL2 LANE0>, <OFFSET1_VAL1 LANE0>, <OFFSET1_VAL1 LANE0>,
 		<OFFSET1_VAL1 LANE0>, <OFFSET1_VAL1 LANE0>, <OFFSET1_VAL1 LANE0>, <OFFSET1_VAL1 LANE0>,
 		<OFFSET1_VAL1 LANE0>, <OFFSET1_VAL1 LANE0>, <OFFSET1_VAL1 LANE0>, <OFFSET1_VAL1 LANE0>;
 	qcom,cdc-micbias1-mv = <2750>;
