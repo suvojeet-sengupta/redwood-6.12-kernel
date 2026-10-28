@@ -7,7 +7,9 @@
 &soc {
 	/*
 	 * The 6.12 icnss2 and qcacld wake the WCN6750 through these before
-	 * touching its registers, as on ravelin; 5.4 never had them.
+	 * touching its registers, as on ravelin; 5.4 never had them, and
+	 * redwood's WPSS firmware never answers on them either (see
+	 * qcom,wlan-legacy-ipc-transport below).
 	 */
 	qcom,smp2p-wpss {
 		smp2p_wlan_2_in: qcom,smp2p-wlan-2-in {
@@ -79,6 +81,15 @@
 		use-nv-mac;
 		dma-coherent;
 		qcom,fw-prefix;
+		/*
+		 * redwood's WPSS firmware is the one its 5.4 kernel ran: it takes
+		 * SOC wake over QMI and the endpoint power save votes on the
+		 * "wlan" smp2p entry. Over the newer smp2p entries the wake was
+		 * never acked ("Unable to wakeup pci ep" every second), the host
+		 * went on to touch the asleep WCN6750, and the phone hard reset
+		 * a few minutes after boot with no log.
+		 */
+		qcom,wlan-legacy-ipc-transport;
 		vdd-cx-mx-supply = <&S7B>;
 		qcom,vdd-cx-mx-config = <824000 1120000 0 0 1>;
 		vdd-1.8-xo-supply = <&S1B>;
