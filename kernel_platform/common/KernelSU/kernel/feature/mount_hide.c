@@ -55,7 +55,13 @@
  */
 
 static DEFINE_MUTEX(ksu_mount_hide_mutex);
-static bool ksu_mount_hide_enabled __read_mostly = true;
+/*
+ * redwood: off by default. Refusing /proc/<pid>/mounts to every app that isn't
+ * granted root makes ART abort ("Failed to open the /proc/mounts file"),
+ * which crash-looped the launcher; SuSFS sus_mount hides mounts without
+ * that. The manager can still turn it on.
+ */
+static bool ksu_mount_hide_enabled __read_mostly = false;
 static bool ksu_mount_hide_running __read_mostly = false;
 
 #define KSU_PROC_MAGIC_NAME_MAX 32
