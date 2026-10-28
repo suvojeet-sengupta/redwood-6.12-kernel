@@ -149,3 +149,23 @@
 &CPU_PD2 {
 	power-domains = <&CLUSTER_PD>;
 };
+
+/*
+ * Entering any cluster idle state resets redwood on 6.12 with no log
+ * (PMIC: PS_HOLD hard reset) a few minutes after boot, and the SMMU loses
+ * its context bank state on the way (an IPA fault showed TTBR0 = 0).
+ * With every deep idle state off, or the cluster states held off, it runs
+ * for good. Keep the CPUs' own power collapse states and leave the
+ * cluster out until whatever loses state there is found.
+ */
+&CLUSTER_SLEEP_APSS_OFF {
+	status = "disabled";
+};
+
+&CLUSTER_SLEEP_CX_RET {
+	status = "disabled";
+};
+
+&CLUSTER_SLEEP_LLCC_OFF {
+	status = "disabled";
+};
