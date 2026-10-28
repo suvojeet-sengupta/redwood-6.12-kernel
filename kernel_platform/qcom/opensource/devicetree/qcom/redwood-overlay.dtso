@@ -31,6 +31,15 @@
 #include "redwood-audio/yupik-audio.dtsi"
 #include "redwood-audio/redwood-audio-overlay.dtsi"
 
+/*
+ * Not on redwood (the ADSP reads the battery), and 6.12's adc5 rejects
+ * V_I_BAT_THERM, which failed the whole PMK8350 ADC: no board thermistors,
+ * no ADC_TM, and both PMIC temp alarms stuck waiting for it.
+ */
+&pmk8350_vadc {
+	/delete-node/ pm7325b_batt_therm;
+};
+
 / {
 	model = "Xiaomi redwood (SM7325)";
 	compatible = "xiaomi,redwood", "qcom,yupik-idp", "qcom,yupik", "qcom,idp";
