@@ -47,7 +47,7 @@ def define_lahaina():
             "CONFIG_MSM_QDSP6_SSR",
             "CONFIG_DIGITAL_CDC_RSC_MGR",
             "CONFIG_SOUNDWIRE_MSTR_CTRL",
-            "CONFIG_SWRM_VER_1P6",
+            "CONFIG_SWRM_VER_1P7",
             "CONFIG_WCD9XXX_CODEC_CORE_V2",
             "CONFIG_MSM_CDC_PINCTRL",
             "CONFIG_SND_SOC_WCD_IRQ",
