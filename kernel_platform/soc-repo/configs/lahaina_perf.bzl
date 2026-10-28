@@ -298,7 +298,6 @@ lahaina_perf_config = {
     "CONFIG_QTI_DDR_COOLING_DEVICE": "m",
     "CONFIG_QTI_DEVFREQ_CDEV": "m",
     "CONFIG_QTI_GLINK_ADC": "m",
-    "CONFIG_QTI_HW_KEY_MANAGER_V1": "m",
     "CONFIG_QTI_IOMMU_SUPPORT": "m",
     "CONFIG_QTI_PMIC_GLINK": "m",
     "CONFIG_QTI_PMIC_GLINK_DEBUG": "m",
