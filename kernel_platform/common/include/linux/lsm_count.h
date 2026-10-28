@@ -102,14 +102,6 @@
 #define IPE_ENABLED
 #endif
 
-/* KernelSU registers as one more LSM; without a slot for it
- * security_add_hooks() panics with "Too many LSMs registered". */
-#if IS_ENABLED(CONFIG_KSU)
-#define KSU_ENABLED 1,
-#else
-#define KSU_ENABLED
-#endif
-
 /*
  *  There is a trailing comma that we need to be accounted for. This is done by
  *  using a skipped argument in __COUNT_LSMS
@@ -132,8 +124,7 @@
 		LANDLOCK_ENABLED	\
 		IMA_ENABLED		\
 		EVM_ENABLED		\
-		IPE_ENABLED		\
-		KSU_ENABLED)
+		IPE_ENABLED)
 
 #else
 
