@@ -201,7 +201,8 @@ free_alloc_data:
 	return rc;
 }
 
-static int msm_audio_ion_unmap_kernel(void *vaddr, void *handle, bool cma_mem)
+static int msm_audio_ion_unmap_kernel(struct iosys_map *vmap, void *handle,
+				      bool cma_mem)
 {
 	int rc = 0;
 	struct device *cb_dev;
@@ -211,7 +212,7 @@ static int msm_audio_ion_unmap_kernel(void *vaddr, void *handle, bool cma_mem)
 	else
 		cb_dev = msm_audio_ion_data.cb_dev;
 
-	if (!vaddr) {
+	if (!vmap || iosys_map_is_null(vmap)) {
 		dev_err(cb_dev,
 			"%s: cannot find allocation for handle %pK\n",
 			__func__, handle);
@@ -219,7 +220,11 @@ static int msm_audio_ion_unmap_kernel(void *vaddr, void *handle, bool cma_mem)
 		goto err;
 	}
 
-	dma_buf_vunmap((struct dma_buf *)handle, vaddr);
+#if (KERNEL_VERSION(6, 2, 0) <= LINUX_VERSION_CODE)
+	dma_buf_vunmap_unlocked((struct dma_buf *)handle, vmap);
+#else
+	dma_buf_vunmap((struct dma_buf *)handle, vmap);
+#endif
 
 	rc = dma_buf_end_cpu_access((struct dma_buf *)handle, DMA_BIDIRECTIONAL);
 	if (rc) {
@@ -255,20 +260,33 @@ static int msm_audio_dma_buf_unmap(void *handle, bool cma_mem)
 		alloc_data = list_entry(ptr, struct msm_audio_alloc_data, list);
 		if (alloc_data->type == MSM_AUDIO_MEM_TYPE_ION) {
 			if (alloc_data->handle == handle) {
-				rc = msm_audio_ion_unmap_kernel(
-							alloc_data->vaddr,
+				/*
+				 * map_kernel keeps the mapping in vmap; the
+				 * 6.12 port looked in vaddr, which nothing
+				 * sets, so every free failed here and left
+				 * the buffer attached and mapped for the
+				 * ADSP with its reference leaked.
+				 */
+				if (alloc_data->vmap) {
+					rc = msm_audio_ion_unmap_kernel(
+							alloc_data->vmap,
 							handle, cma_mem);
-			if (rc) {
-				pr_err("%s: Unable to unmap ion mem rc: %d\n",
-				       __func__, rc);
-				mutex_unlock(&(msm_audio_ion_data.list_mutex));
-				return rc;
-			}
+					if (rc)
+						pr_err("%s: Unable to unmap ion mem rc: %d\n",
+						       __func__, rc);
+				}
 
 				found = true;
+#if (KERNEL_VERSION(6, 2, 0) <= LINUX_VERSION_CODE)
+				dma_buf_unmap_attachment_unlocked(
+							 alloc_data->attach,
+							 alloc_data->table,
+							 DMA_BIDIRECTIONAL);
+#else
 				dma_buf_unmap_attachment(alloc_data->attach,
 							 alloc_data->table,
 							 DMA_BIDIRECTIONAL);
+#endif
 
 				dma_buf_detach((struct dma_buf *)
 						alloc_data->handle,
@@ -278,6 +296,7 @@ static int msm_audio_dma_buf_unmap(void *handle, bool cma_mem)
 					    alloc_data->handle);
 
 				list_del(&(alloc_data->list));
+				kfree(alloc_data->vmap);
 				kfree(alloc_data);
 				break;
 			}
@@ -367,7 +386,11 @@ static int msm_audio_ion_map_kernel(void *handle,
 		goto exit;
 	}
 
+#if (KERNEL_VERSION(6, 2, 0) <= LINUX_VERSION_CODE)
+	rc = dma_buf_vmap_unlocked((struct dma_buf *)handle, iosys_vmap);
+#else
 	rc = dma_buf_vmap((struct dma_buf *)handle, iosys_vmap);
+#endif
 	if (rc) {
 		pr_err("%s: kernel mapping of dma_buf failed\n",
 		       __func__);
@@ -451,10 +474,7 @@ static int msm_audio_ion_map_buf(void *handle, dma_addr_t *paddr,
 		pr_err("%s: ION memory mapping for AUDIO failed, err:%d\n",
 				__func__, rc);
 		rc = -ENOMEM;
-		mutex_lock(&(msm_audio_ion_data.list_mutex));
-		//msm_audio_dma_buf_unmap(dma_buf, ion_data);
 		msm_audio_dma_buf_unmap((struct dma_buf *)handle, false);
-		mutex_unlock(&(msm_audio_ion_data.list_mutex));
 		goto err;
 	}
 
