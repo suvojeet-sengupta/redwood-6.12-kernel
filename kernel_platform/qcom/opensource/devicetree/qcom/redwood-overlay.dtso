@@ -127,3 +127,15 @@
 				   5000000 4500000 4000000 3500000 3000000
 				   2500000 2000000 1500000 1000000 500000>;
 };
+
+/*
+ * The PMIC keeps a log of every power on and off, with its reason, in
+ * SDAM 5 of the PMK8350, as on lahaina; read it so a reset says why.
+ */
+&soc {
+	pmic-pon-log {
+		compatible = "qcom,pmic-pon-log";
+		nvmem = <&pmk8350_sdam_5>;
+		nvmem-names = "pon_log";
+	};
+};
