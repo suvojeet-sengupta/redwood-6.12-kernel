@@ -146,6 +146,12 @@
 			dma-coherent;
 			qcom,iommu-dma = "fastmap";
 			qcom,ipa-q6-smem-size = <36864>;
+			/*
+			 * IPA registers no fault handler, so a fatal fault here is
+			 * a BUG() in arm-smmu: a panic and an instant reset with
+			 * no log. Log the fault and abort the access instead.
+			 */
+			qcom,iommu-faults = "non-fatal";
 		};
 
 		ipa_smmu_wlan: ipa_smmu_wlan {
@@ -153,6 +159,7 @@
 			iommus = <&apps_smmu 0x481 0x0>;
 			qcom,iommu-dma = "atomic";
 			dma-coherent;
+			qcom,iommu-faults = "non-fatal";
 		};
 
 		ipa_smmu_uc: ipa_smmu_uc {
@@ -161,6 +168,7 @@
 			qcom,ipa-dma-addr-pool = <0x20000000 0x20000000>;
 			memory-region = <&ipa_uc_iova>;
 			qcom,iommu-dma = "atomic";
+			qcom,iommu-faults = "non-fatal";
 		};
 
 	};
