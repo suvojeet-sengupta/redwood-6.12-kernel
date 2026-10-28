@@ -169,3 +169,12 @@
 &CLUSTER_SLEEP_LLCC_OFF {
 	status = "disabled";
 };
+
+/*
+ * redwood has no motor on the PMIC LDO vibrator output: the vibrator is the
+ * AW86927 (redwood-haptics.dtsi). With this node probed it takes
+ * /sys/class/leds/vibrator, the vibrator HAL drives it and nothing buzzes.
+ */
+&pm7250b_vib {
+	status = "disabled";
+};
