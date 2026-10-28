@@ -139,3 +139,13 @@
 		nvmem-names = "pon_log";
 	};
 };
+
+/*
+ * yupik.dtsi spells this "Power-domains", so CPU2 was never part of the
+ * cluster domain: with OS-initiated PSCI the cluster could power down
+ * while CPU2 was still running, and the phone reset every few minutes.
+ * Set it here too, for a base DTB built before the fix.
+ */
+&CPU_PD2 {
+	power-domains = <&CLUSTER_PD>;
+};
