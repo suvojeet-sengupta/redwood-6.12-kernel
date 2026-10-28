@@ -612,6 +612,16 @@ static int msm_geni_serial_config_baud_rate(struct uart_port *uport,
 static int msm_geni_serial_ioctl(struct uart_port *uport, unsigned int cmd,
 				 unsigned long arg);
 
+/*
+ * The numbers the 5.4 msm kernels gave these in asm-generic/ioctls.h, which
+ * redwood's vendor Bluetooth HAL still sends: without them its clock vote
+ * was ignored, the UART suspended in the middle of the firmware patch
+ * download and Bluetooth never came up (PatchDnldStuck).
+ */
+#define MSM_GENI_SERIAL_LEGACY_TIOCPMGET	0x544D
+#define MSM_GENI_SERIAL_LEGACY_TIOCPMPUT	0x544E
+#define MSM_GENI_SERIAL_LEGACY_TIOCPMACT	0x544F
+
 #define GET_DEV_PORT(uport) \
 	container_of(uport, struct msm_geni_serial_port, uport)
 
@@ -1606,14 +1616,17 @@ static int msm_geni_serial_ioctl(struct uart_port *uport, unsigned int cmd,
 		return ret;
 
 	switch (cmd) {
+	case MSM_GENI_SERIAL_LEGACY_TIOCPMGET:
 	case MSM_GENI_SERIAL_TIOCPMGET: {
 		ret = vote_clock_on(uport);
 		break;
 	}
+	case MSM_GENI_SERIAL_LEGACY_TIOCPMPUT:
 	case MSM_GENI_SERIAL_TIOCPMPUT: {
 		ret = vote_clock_off(uport);
 		break;
 	}
+	case MSM_GENI_SERIAL_LEGACY_TIOCPMACT:
 	case MSM_GENI_SERIAL_TIOCPMACT: {
 		ret = !pm_runtime_status_suspended(uport->dev);
 		break;
