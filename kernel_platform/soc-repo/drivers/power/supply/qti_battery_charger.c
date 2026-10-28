@@ -1626,7 +1626,6 @@ static int battery_psy_set_charge_current(struct battery_chg_dev *bcdev,
 					int val)
 {
 	int rc;
-	u32 fcc_ua, prev_fcc_ua;
 
 	if (!bcdev->num_thermal_levels)
 		return 0;
@@ -1636,25 +1635,29 @@ static int battery_psy_set_charge_current(struct battery_chg_dev *bcdev,
 		return -EINVAL;
 	}
 
-	if (val < 0 || val > bcdev->num_thermal_levels)
+	if (val < 0 || val >= bcdev->num_thermal_levels)
 		return -EINVAL;
 
-	if (bcdev->thermal_fcc_step == 0)
-		fcc_ua = bcdev->thermal_levels[val];
-	else
-		fcc_ua = bcdev->psy_list[PSY_TYPE_BATTERY].prop[BATT_CHG_CTRL_LIM_MAX]
-				- (bcdev->thermal_fcc_step * val);
+	if (val == bcdev->curr_thermal_level)
+		return 0;
 
-	prev_fcc_ua = bcdev->thermal_fcc_ua;
-	bcdev->thermal_fcc_ua = fcc_ua;
+	/*
+	 * Xiaomi's charger firmware takes the thermal level itself in
+	 * BATT_CHG_CTRL_LIM and looks the current up in its own table, as the
+	 * 5.4 redwood driver sent it. A current in uA (12210000 at level 0)
+	 * indexes past that table and crashes charger_pd, and after every
+	 * restart subsys_up_work sent it again: the charger dropped out every
+	 * few seconds and Android read the battery as 0%.
+	 */
+	rc = write_property_id(bcdev, &bcdev->psy_list[PSY_TYPE_BATTERY],
+				BATT_CHG_CTRL_LIM, val);
+	if (rc < 0) {
+		pr_err("Failed to set thermal level %d, rc=%d\n", val, rc);
+		return rc;
+	}
 
-	rc = __battery_psy_set_charge_current(bcdev, fcc_ua);
-	if (!rc)
-		bcdev->curr_thermal_level = val;
-	else
-		bcdev->thermal_fcc_ua = prev_fcc_ua;
-
-	return rc;
+	bcdev->curr_thermal_level = val;
+	return 0;
 }
 
 static int battery_psy_get_prop(struct power_supply *psy,
