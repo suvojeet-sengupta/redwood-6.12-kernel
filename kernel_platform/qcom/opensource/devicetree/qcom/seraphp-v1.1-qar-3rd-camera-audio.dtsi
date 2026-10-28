@@ -6,6 +6,13 @@
 #include "seraphp-qar-camera-audio.dtsi"
 #include "seraphp-pmslg5.dtsi"
 
+&reserved_memory {
+	lpai_display_region: lpai_display_region@ba200000 {
+		no-map;
+		reg = <0x0 0xba200000 0x0 0x4000000>;
+	};
+};
+
 &pm8011m {
 	status = "disabled";
 	/delete-node/ pm8011m_reset;
@@ -76,14 +83,15 @@
 		compatible = "ti,tps6286";
 		reg = <0x40>;
 	};
-};
 
-&spmi0_bus {
-	/delete-node/ pm8010@c;
-	/delete-node/ pm8010@d;
-};
+	ina234b_left: ina234bl@48 {
+		compatible = "ti,ina234b";
+		reg = <0x48>;
+		left;
+	};
 
-&spmi0_debug_bus {
-	/delete-node/ qcom,pm8010-debug@c;
-	/delete-node/ qcom,pm8010-debug@d;
+	ina234b_right: ina234br@49 {
+		compatible = "ti,ina234b";
+		reg = <0x49>;
+	};
 };

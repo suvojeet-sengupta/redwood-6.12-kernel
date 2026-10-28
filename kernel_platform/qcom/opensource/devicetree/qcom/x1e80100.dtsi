@@ -222,7 +222,7 @@
 			next-level-cache = <&L2_2>;
 			power-domains = <&cpu_pd8>, <&scmi_dvfs 2>;
 			power-domain-names = "psci", "perf";
-			capacity-dmips-mhz = <1024>;
+			capacity-dmips-mhz = <1026>;
 			dynamic-power-coefficient = <100>;
 			#cooling-cells = <2>;
 			cpu-idle-states = <&cluster_c4>;
@@ -242,7 +242,7 @@
 			next-level-cache = <&L2_2>;
 			power-domains = <&cpu_pd9>, <&scmi_dvfs 2>;
 			power-domain-names = "psci", "perf";
-			capacity-dmips-mhz = <1024>;
+			capacity-dmips-mhz = <1026>;
 			dynamic-power-coefficient = <100>;
 			#cooling-cells = <2>;
 			cpu-idle-states = <&cluster_c4>;
@@ -256,7 +256,7 @@
 			next-level-cache = <&L2_2>;
 			power-domains = <&cpu_pd10>, <&scmi_dvfs 2>;
 			power-domain-names = "psci", "perf";
-			capacity-dmips-mhz = <1024>;
+			capacity-dmips-mhz = <1026>;
 			dynamic-power-coefficient = <100>;
 			#cooling-cells = <2>;
 			cpu-idle-states = <&cluster_c4>;
@@ -270,7 +270,7 @@
 			next-level-cache = <&L2_2>;
 			power-domains = <&cpu_pd11>, <&scmi_dvfs 2>;
 			power-domain-names = "psci", "perf";
-			capacity-dmips-mhz = <1024>;
+			capacity-dmips-mhz = <1026>;
 			dynamic-power-coefficient = <100>;
 			#cooling-cells = <2>;
 			cpu-idle-states = <&cluster_c4>;
@@ -712,7 +712,7 @@
 			no-map;
 		};
 
-		reserved-region@d8029000 {
+		reserved_mem: reserved-region@d8029000 {
 			reg = <0x0 0xd8029000 0x0 0x1000>;
 			no-map;
 		};
@@ -942,7 +942,7 @@
 
 			 alg2 {
 				 alg-name = "alg2";
-				 status = "disabled";
+				 status = "ok";
 
 			 };
 
@@ -2117,6 +2117,8 @@
 			qcom,use-eusb2-phy;
 			qcom,host-poweroff-in-pm-suspend;
 			qcom,default-mode-host;
+			qcom,disable-host-ssphy-powerdown;
+			qcom,force-suspend;
 
 			qcom,dis-sending-cm-l1-quirk;
 			qcom,core-clk-rate = <200000000>;
@@ -2127,6 +2129,7 @@
 			interconnects = <&aggre1_noc MASTER_USB3_0 0 &mc_virt SLAVE_EBI1 0>,
 					<&gem_noc MASTER_APPSS_PROC 0 &config_noc SLAVE_USB3_0 0>;
 
+			wakeup-source;
 			/*
 			 * Establish dependency on smmu driver so that depopulate path of
 			 * deferred probe doesn't run into existing bug in smmu driver.
@@ -2202,7 +2205,7 @@
 			vdda12-supply = <&L2J>;
 
 			clocks = <&xo_board>,
-				<&tcsrcc TCSR_USB2_1_CLKREF_EN>;
+				 <&rpmhcc RPMH_CXO_CLK>;
 			clock-names = "ref_clk_src", "ref";
 
 			#phy-cells = <0>;
@@ -2318,6 +2321,7 @@
 			qcom,use-eusb2-phy;
 			qcom,host-poweroff-in-pm-suspend;
 			qcom,default-mode-host;
+			qcom,disable-host-ssphy-powerdown;
 
 			qcom,dis-sending-cm-l1-quirk;
 			qcom,core-clk-rate = <120000000>;
@@ -2375,7 +2379,7 @@
 			vdda12-supply = <&L3E>;
 
 			clocks = <&xo_board>,
-				<&tcsrcc TCSR_USB2_2_CLKREF_EN>;
+				 <&rpmhcc RPMH_CXO_CLK>;
 			clock-names = "ref_clk_src", "ref";
 
 			#phy-cells = <0>;
@@ -2425,6 +2429,8 @@
 			qcom,use-eusb2-phy;
 			qcom,host-poweroff-in-pm-suspend;
 			qcom,default-mode-host;
+			qcom,disable-host-ssphy-powerdown;
+			qcom,force-suspend;
 
 			qcom,dis-sending-cm-l1-quirk;
 			qcom,core-clk-rate = <200000000>;
@@ -2434,6 +2440,8 @@
 			interconnect-names = "usb-ddr", "ddr-usb";
 			interconnects = <&usb_south_anoc MASTER_USB3_1 &mc_virt SLAVE_EBI1>,
 					<&gem_noc MASTER_APPSS_PROC &config_noc SLAVE_USB3_1>;
+
+			wakeup-source;
 
 			/*
 			 * Establish dependency on smmu driver so that depopulate path of
@@ -2510,7 +2518,7 @@
 			vdda12-supply = <&L2J>;
 
 			clocks = <&xo_board>,
-				<&tcsrcc TCSR_USB2_1_CLKREF_EN>;
+				 <&rpmhcc RPMH_CXO_CLK>;
 			clock-names = "ref_clk_src", "ref";
 
 			#phy-cells = <0>;
@@ -2653,6 +2661,32 @@
 				maximum-speed = "super-speed-plus";
 				usb-role-switch;
 			};
+
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				port@0 {
+					reg = <0>;
+
+					usb_port2_hs_in: endpoint {
+					};
+				};
+
+				port@1 {
+					reg = <1>;
+
+					usb_port2_dwc3_ss: endpoint {
+					};
+				};
+
+				port@2 {
+					reg = <2>;
+
+					usb_port2_configure_out: endpoint {
+					};
+				};
+			};
 		};
 
 		dwc3_2_mem_region: dwc3_2_mem_region {
@@ -2708,8 +2742,23 @@
 			#phy-cells = <1>;
 
 			vdda-phy-supply = <&L2J>;
-			vdda-pll-supply = <&L1J>;
+			vdda-pll-supply = <&L2D>;
+
+			orientation-switch;
+
 			status = "disabled";
+
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				port@0 {
+					reg = <0>;
+
+					usb_port2_ssphy_out: endpoint {
+					};
+				};
+			};
 		};
 
 		intc: interrupt-controller@17000000 {
@@ -2989,10 +3038,27 @@
 			qcom,low-latency;
 		};
 
+		/* QRTR MHI entry for SDX35 */
+		qcom,qrtr-mhi-cnss3 {
+			compatible = "qcom,qrtr-mhi";
+			qcom,dev-id = <0x110a>;
+			qcom,net-id = <0>;
+			qcom,low-latency;
+		};
+
+		/* QRTR MHI entry for SDX65 */
 		qcom,qrtr-mhi-cnss2 {
 			compatible = "qcom,qrtr-mhi";
 			qcom,dev-id = <0x0308>;
-			qcom,net-id = <1>;
+			qcom,net-id = <0>;
+			qcom,low-latency;
+		};
+
+		/* QRTR MHI entry for SDX81 */
+		qcom,qrtr-mhi-cnss4 {
+			compatible = "qcom,qrtr-mhi";
+			qcom,dev-id = <0x0309>;
+			qcom,net-id = <0>;
 			qcom,low-latency;
 		};
 
@@ -3874,7 +3940,7 @@
 };
 
 &tlmm {
-	wlan_tps_3v3_enable_state: wlan-tps-3v3-enable {
+	wlan_tps_kiwi_3v3_enable_state: wlan-tps-kiwi-3v3-enable {
 		mux {
 			pins = "gpio214";
 			function = "gpio";
@@ -3886,10 +3952,23 @@
 			output-high;
 		};
 	};
+
+	wlan_tps_3v3_enable_state: wlan-tps-3v3-enable {
+		mux {
+			pins = "gpio225";
+			function = "gpio";
+		};
+
+		config {
+			pins = "gpio225";
+			bias-pull-up;
+			output-high;
+		};
+	};
 };
 
 &{/} {
-	vreg_wlan_3p3: wlan-3p3-regulator {
+	vreg_wlan_kiwi_3p3: wlan-kiwi-3p3-regulator {
 		compatible = "regulator-fixed";
 		regulator-name = "vreg_wlan_3p3";
 
@@ -3897,6 +3976,20 @@
 		regulator-max-microvolt = <3300000>;
 
 		gpio = <&tlmm 214 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&wlan_tps_kiwi_3v3_enable_state>;
+	};
+
+	vreg_wlan_3p3: wlan-3p3-regulator {
+		compatible = "regulator-fixed";
+		regulator-name = "vreg_wlan_3p3";
+
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+
+		gpio = <&tlmm 225 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
 
 		pinctrl-names = "default";

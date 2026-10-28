@@ -50,7 +50,6 @@
 
 		pinctrl-names = "init", "default", "sleep";
 		pinctrl-0 = <&pcie5_perst_init
-				&pcie5_perst_default
 				&pcie5_clkreq_default
 				&pcie5_wake_default>;
 		pinctrl-1 = <&pcie5_perst_default

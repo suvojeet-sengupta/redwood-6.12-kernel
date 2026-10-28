@@ -16,7 +16,7 @@
 	interrupt-parent = <&intc>;
 
 	chosen {
-		bootargs = "console=hvc0 root=/dev/ram rw rootwait nokaslr log_buf_len=1M ufshcd-core.use_mcq_mode=n kpti=0 loglevel=8 printk.devkmsg=on maxcpus=6 driver_async_probe=arm-scmi fw_devlink.strict=1 iommu.strict=0";
+		bootargs = "console=hvc0 root=/dev/ram rw rootwait nokaslr log_buf_len=1M ufshcd-core.use_mcq_mode=n kpti=0 loglevel=8 printk.devkmsg=on maxcpus=8 driver_async_probe=arm-scmi fw_devlink.strict=1 iommu.strict=0";
 		bootconfig = "androidboot.fstab_suffix=hgy.seca.qcom";
 	};
 
@@ -145,36 +145,90 @@
 			cpu-idle-states = <&CPU_PWR_DWN>;
 		};
 
-		CPU2: cpu@200 {
+		CPU2: cpu@10000 {
 			compatible = "arm,armv8";
-			reg = <0x0 0x200>;
+			reg = <0x0 0x10000>;
 			device_type = "cpu";
 			enable-method = "psci";
 			cpu-idle-states = <&CPU_PWR_DWN>;
 		};
 
-		CPU3: cpu@300 {
+		CPU3: cpu@10100 {
 			compatible = "arm,armv8";
-			reg = <0x0 0x300>;
+			reg = <0x0 0x10100>;
 			device_type = "cpu";
 			enable-method = "psci";
 			cpu-idle-states = <&CPU_PWR_DWN>;
 		};
 
-		CPU4: cpu@400 {
+		CPU4: cpu@10200 {
 			compatible = "arm,armv8";
-			reg = <0x0 0x400>;
+			reg = <0x0 0x10200>;
 			device_type = "cpu";
 			enable-method = "psci";
 			cpu-idle-states = <&CPU_PWR_DWN>;
 		};
 
-		CPU5: cpu@500 {
+		CPU5: cpu@10300 {
 			compatible = "arm,armv8";
-			reg = <0x0 0x500>;
+			reg = <0x0 0x10300>;
 			device_type = "cpu";
 			enable-method = "psci";
 			cpu-idle-states = <&CPU_PWR_DWN>;
+		};
+
+		CPU6: cpu@10400 {
+			compatible = "arm,armv8";
+			reg = <0x0 0x10400>;
+			device_type = "cpu";
+			enable-method = "psci";
+			cpu-idle-states = <&CPU_PWR_DWN>;
+		};
+
+		CPU7: cpu@10500 {
+			compatible = "arm,armv8";
+			reg = <0x0 0x10500>;
+			device_type = "cpu";
+			enable-method = "psci";
+			cpu-idle-states = <&CPU_PWR_DWN>;
+		};
+
+		cpu-map {
+			cluster0 {
+				core0 {
+					cpu = <&CPU0>;
+				};
+
+				core1 {
+					cpu = <&CPU1>;
+				};
+			};
+
+			cluster1 {
+				core0 {
+					cpu = <&CPU2>;
+				};
+
+				core1 {
+					cpu = <&CPU3>;
+				};
+
+				core2 {
+					cpu = <&CPU4>;
+				};
+
+				core3 {
+					cpu = <&CPU5>;
+				};
+
+				core4 {
+					cpu = <&CPU6>;
+				};
+
+				core5 {
+					cpu = <&CPU7>;
+				};
+			};
 		};
 	};
 
@@ -1232,6 +1286,23 @@
 				};
 			};
 
+			/* Compressched virtio */
+			virtio-mmio@52 {
+				vdevice-type = "virtio-mmio";
+				generate = "/virtio-mmio";
+				peer-default;
+				vqs-num = <0x2>;
+				push-compatible = "virtio,mmio";
+				sync-reset;
+				dma-coherent;
+				dma_base = <0x0 0x308000>;
+				memory {
+					qcom,label = <0x55>;
+					#address-cells = <0x2>;
+					allocate-base;
+				};
+			};
+
 			vsmmu@15a00000 {
 				vdevice-type = "vsmmu-v2";
 				smmu-handle = <0x15a00000>;
@@ -1277,32 +1348,51 @@
 				};
 			};
 
-
-			hab-virq5-dbl {
+			hab_virq_dbl5 {
 				vdevice-type = "doorbell";
-				generate = "/hypervisor/hab-virq5-dbl";
+				generate = "/hypervisor/hab_virq_5";
 				qcom,label = <0x5>;
+				push-compatible = "qcom,msm-virt_irq";
 				peer-default;
 			};
 
-			hab-virq5-dbl-source {
-				vdevice-type = "doorbell-source";
-				generate = "/hypervisor/hab-virq5-dbl-source";
-				qcom,label = <0x5>;
-				peer-default;
-			};
-
-			hab-virq6-dbl {
+			hab_virq_dbl6 {
 				vdevice-type = "doorbell";
-				generate = "/hypervisor/hab-virq6-dbl";
+				generate = "/hypervisor/hab_virq_6";
 				qcom,label = <0x6>;
+				push-compatible = "qcom,msm-virt_irq";
 				peer-default;
 			};
 
-			hab-virq6-dbl-source {
-				vdevice-type = "doorbell-source";
-				generate = "/hypervisor/hab-virq6-dbl-source";
-				qcom,label = <0x6>;
+			hab_virq_dbl9 {
+				vdevice-type = "doorbell";
+				generate = "/hypervisor/hab_virq_9";
+				qcom,label = <0x9>;
+				push-compatible = "qcom,msm-virt_irq";
+				peer-default;
+			};
+
+			hab_virq_dbl10 {
+				vdevice-type = "doorbell";
+				generate = "/hypervisor/hab_virq_a";
+				qcom,label = <0xa>;
+				push-compatible = "qcom,msm-virt_irq";
+				peer-default;
+			};
+
+			hab_virq_dbl11 {
+				vdevice-type = "doorbell";
+				generate = "/hypervisor/hab_virq_b";
+				qcom,label = <0xb>;
+				push-compatible = "qcom,msm-virt_irq";
+				peer-default;
+			};
+
+			hab_virq_dbl12 {
+				vdevice-type = "doorbell";
+				generate = "/hypervisor/hab_virq_c";
+				qcom,label = <0xc>;
+				push-compatible = "qcom,msm-virt_irq";
 				peer-default;
 			};
 
@@ -1458,6 +1548,14 @@
 		};
 	};
 
+	tsc@1c81000 {
+		compatible = "qcom,tsc-vm";
+		reg = <0x1c81000 0x1000>;
+		reg-names = "tsc";
+		qcom,tsc-nsec-update;
+		status = "okay";
+	};
+
 	qcom,mpm2-sleep-counter@c221000 {
 			compatible = "qcom,mpm2-sleep-counter";
 			reg = <0xc221000 0x1000>;
@@ -1512,7 +1610,7 @@
 	};
 
 	tlmm: pinctrl@f000000 {
-		compatible = "qcom,sa8797p-tlmm";
+		compatible = "qcom,seca-tlmm";
 		reg = <0xf000000 0x1000000>;
 		interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
 		gpio-controller;
@@ -1532,8 +1630,15 @@
 		#interrupt-cells = <0x3>;
 		#redistributor-regions = <1>;
 		redistributor-stride = <0x0 0x20000>;
-		reg = <0x17a00000 0x10000>,     /* GICD */
-		      <0x17a60000 0x240000>;    /* GICR * 18 */
+		reg = <0x17a00000 0x10000>, /* GICD */
+		      <0x17a60000 0x240000>; /* GICR * 18 */
+		interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
+		gic_its: msi-controller@0x17040000 {
+			compatible = "arm,gic-v3-its";
+			msi-controller;
+			#msi-cells = <1>;
+			reg = <0x17040000 0x20000>;
+		};
 	};
 
 	wdog: qcom,wdt@17826000 {
@@ -1660,7 +1765,6 @@
 	hab: qcom,hab {
 		compatible = "qcom,hab";
 		vmid = <2>;
-		virt-irq = <0x4 0x5 0x6>;
 
 		mmidgrp100: mmidgrp100 {
 			grp-start-id = <100>;
@@ -1782,6 +1886,17 @@
 		interrupt-controller;
 	};
 
+	qcom,test-dbl-gvm1 {
+		compatible = "qcom,gh-dbl";
+		qcom,label = <0x4>;
+	};
+
+	qcom,test-msgq-gvm1 {
+		compatible = "qcom,gh-msgq-test";
+		gunyah-label = <4>;
+		affinity = <0>;
+	};
+
 	qcom,gh-qtimer@17C25000 {
 		compatible = "qcom,gh-qtmr";
 		reg = <0x17425000 0x1000>;
@@ -1817,6 +1932,21 @@
 	};
 };
 
+&remoteproc_hpass0_glink {
+	qcom,fastrpc {
+		label = "hpass";
+		instance-id = <0>;
+		dsp-type = <5>;
+	};
+};
+
+&remoteproc_hpass1_glink {
+	qcom,fastrpc {
+		label = "hpass";
+		instance-id = <1>;
+		dsp-type = <5>;
+	};
+};
 
 / {
 	rename_devices: rename_devices {
@@ -1839,7 +1969,7 @@
 					"dtbo_a", "dsp_b", "dsp_a",
 					"vendor_boot_b", "vendor_boot_a",
 					"init_boot_b", "init_boot_a", "devinfo",
-					"bootloader_b", "bootloader_a";
+					"vm-bootloader_b", "vm-bootloader_a";
 		};
 	};
 };

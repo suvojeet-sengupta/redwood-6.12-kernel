@@ -351,7 +351,7 @@
 		interrupt-controller;
 		#interrupt-cells = <2>;
 		// Valid Soc dependent pin
-		gpios = /bits/ 16 <92 93 10 11 12 13>;
+		gpios = /bits/ 16 <92 93 10 11 12 13 95 105>;
 
 		required-subnodes = <&qupv3_se11_i2c_active
 				&qupv3_se11_i2c_sleep>;
@@ -391,11 +391,13 @@
 				&tlmm 10 0
 				&tlmm 11 0
 				&tlmm 12 0
-				&tlmm 13 0x2008>;
+				&tlmm 13 0x2008
+				&tlmm 95 0
+				&tlmm 105 0x2008>;
 	};
 
 	tlmm_vm_test: tlmm-vm-test {
-		ccompatible = "qcom,tlmm-vm-test";
+		compatible = "qcom,tlmm-vm-test";
 		pinctrl-names = "active", "sleep";
 		pinctrl-0 = <&qupv3_se11_i2c_active>;
 		pinctrl-1 = <&qupv3_se11_i2c_sleep>;

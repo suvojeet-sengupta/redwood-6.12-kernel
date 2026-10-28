@@ -11,7 +11,7 @@
 / {
 	model = "Qualcomm Technologies, Inc. Bourtzi SVM MTP";
 	compatible = "qcom,bourtzi-mtp", "qcom,mtp", "qcom,bourtzi";
-	qcom,board-id = <0x20008 0x0>;
+	qcom,board-id = <0x8 0x0>;
 
 	host {
 	};

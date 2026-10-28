@@ -27,7 +27,7 @@
 	};
 
 	chosen {
-		bootargs = "nokaslr log_buf_len=1M ufshcd-core.use_mcq_mode=n driver_async_probe=arm-scmi pcie_pme=nomsi fw_devlink.strict=1";
+		bootargs = "nokaslr log_buf_len=1M ufshcd-core.use_mcq_mode=n driver_async_probe=arm-scmi pcie_pme=nomsi fw_devlink.strict=1 maxcpus=4";
 		bootconfig = "androidboot.audio=ar","androidboot.dtbo_idx=6";
 	};
 
@@ -96,11 +96,45 @@
 		#address-cells = <0x2>;
 		#size-cells = <0x0>;
 
+		cluster_0_opp_table: opp-table0 {
+			compatible = "operating-points-v2";
+			opp-shared;
+
+			opp-2361600000 {
+				opp-hz = /bits/ 64 <2361600000>;
+				opp-microvolt = <968000>;
+			};
+		};
+
+		cluster_1_opp_table: opp-table1 {
+			compatible = "operating-points-v2";
+			opp-shared;
+
+			opp-2112000000 {
+				opp-hz = /bits/ 64 <2112000000>;
+				opp-microvolt = <968000>;
+			};
+		};
+
+		cluster_2_opp_table: opp-table2 {
+			compatible = "operating-points-v2";
+			opp-shared;
+
+			opp-1958400000 {
+				opp-hz = /bits/ 64 <1958400000>;
+				opp-microvolt = <968000>;
+			};
+		};
+
+
 		CPU0: cpu@0 {
 			compatible = "arm,armv8";
 			reg = <0x0 0x0>;
 			device_type = "cpu";
 			enable-method = "psci";
+			capacity-dmips-mhz = <1024>;
+			dynamic-power-coefficient = <507>;
+			operating-points-v2 = <&cluster_0_opp_table>;
 			cpu-idle-states = <&CPU_PWR_DWN>;
 		};
 
@@ -109,6 +143,9 @@
 			reg = <0x0 0x100>;
 			device_type = "cpu";
 			enable-method = "psci";
+			capacity-dmips-mhz = <1024>;
+			dynamic-power-coefficient = <507>;
+			operating-points-v2 = <&cluster_0_opp_table>;
 			cpu-idle-states = <&CPU_PWR_DWN>;
 		};
 
@@ -117,6 +154,9 @@
 			reg = <0x0 0x200>;
 			device_type = "cpu";
 			enable-method = "psci";
+			capacity-dmips-mhz = <1024>;
+			dynamic-power-coefficient = <472>;
+			operating-points-v2 = <&cluster_1_opp_table>;
 			cpu-idle-states = <&CPU_PWR_DWN>;
 		};
 
@@ -125,6 +165,9 @@
 			reg = <0x0 0x300>;
 			device_type = "cpu";
 			enable-method = "psci";
+			capacity-dmips-mhz = <1024>;
+			dynamic-power-coefficient = <472>;
+			operating-points-v2 = <&cluster_1_opp_table>;
 			cpu-idle-states = <&CPU_PWR_DWN>;
 		};
 
@@ -133,6 +176,9 @@
 			reg = <0x0 0x10000>;
 			device_type = "cpu";
 			enable-method = "psci";
+			capacity-dmips-mhz = <350>;
+			dynamic-power-coefficient = <100>;
+			operating-points-v2 = <&cluster_2_opp_table>;
 			cpu-idle-states = <&CPU_PWR_DWN>;
 		};
 
@@ -141,6 +187,9 @@
 			reg = <0x0 0x10100>;
 			device_type = "cpu";
 			enable-method = "psci";
+			capacity-dmips-mhz = <350>;
+			dynamic-power-coefficient = <100>;
+			operating-points-v2 = <&cluster_2_opp_table>;
 			cpu-idle-states = <&CPU_PWR_DWN>;
 		};
 
@@ -149,6 +198,9 @@
 			reg = <0x0 0x10200>;
 			device_type = "cpu";
 			enable-method = "psci";
+			capacity-dmips-mhz = <350>;
+			dynamic-power-coefficient = <100>;
+			operating-points-v2 = <&cluster_2_opp_table>;
 			cpu-idle-states = <&CPU_PWR_DWN>;
 		};
 
@@ -157,8 +209,12 @@
 			reg = <0x0 0x10300>;
 			device_type = "cpu";
 			enable-method = "psci";
+			capacity-dmips-mhz = <350>;
+			dynamic-power-coefficient = <100>;
+			operating-points-v2 = <&cluster_2_opp_table>;
 			cpu-idle-states = <&CPU_PWR_DWN>;
 		};
+
 
 		cpu-map {
 			cluster0 {
@@ -169,17 +225,19 @@
 				core1 {
 					cpu = <&CPU1>;
 				};
+			};
 
-				core2 {
+			cluster1 {
+				core0 {
 					cpu = <&CPU2>;
 				};
 
-				core3 {
+				core1 {
 					cpu = <&CPU3>;
 				};
 			};
 
-			cluster1 {
+			cluster2 {
 				core0 {
 					cpu = <&CPU4>;
 				};
@@ -197,6 +255,7 @@
 				};
 			};
 		};
+
 	};
 
 	idle-states {
@@ -429,7 +488,7 @@
 		vcpus {
 			config = "/cpus";
 			affinity = "static";
-			affinity-map = <0x7 0x6 0x5 0x4 0x3 0x2 0x1 0x0>;
+			affinity-map = <0x3 0x2 0x1 0x0 0x7 0x6 0x5 0x4>;
 			sched-priority = <0>;       /* relative to PVM */
 			sched-timeslice = <1000>;   /* in ms */
 		};
@@ -1561,7 +1620,7 @@
 		dma-coherent;
 		interrupts-extended = <&intc 0 870 1>, <&intc 0 941 1>;
 		interrupt-names = "rx_ch0_intr", "tx_ch0_intr";
-		power-domains = <&scmi_power 6>;
+		power-domains = <&scmi_power 10>;
 		power-domain-names = "gvm_power_mdio";
 		snps,tso;
 		snps,pbl = <32>;
@@ -1575,7 +1634,6 @@
 		qcom,iommu-geometry = <0x80000000 0x40000000>;
 		memory-region = <&emac_iommu_region>;
 		qcom,iommu-dma = "fastmap";
-
 	};
 
 	logbuf: qcom,logbuf-vendor-hooks {

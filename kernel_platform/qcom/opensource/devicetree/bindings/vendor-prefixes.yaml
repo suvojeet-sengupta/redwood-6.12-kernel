@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 %YAML 1.2
 ---
 $id: http://devicetree.org/schemas/vendor-prefixes.yaml#
@@ -111,6 +111,8 @@ patternProperties:
     description: Anbernic
   "^andestech,.*":
     description: Andes Technology Corporation
+  "^android,.*":
+    description: Android Open Source Project
   "^anvo,.*":
     description: Anvo-Systems Dresden GmbH
   "^apm,.*":

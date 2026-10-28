@@ -8,33 +8,6 @@
 &soc {
 };
 
-&tlmm {
-	edp_hpd_ctrl: hpd_ctrl@60 {
-		mux {
-			pins = "gpio60";
-			function = "edp_hot";
-		};
-
-		config {
-			pins = "gpio60";
-			bias-disable;
-			input-enable;
-			drive-strength = <2>;
-		};
-	};
-};
-
-&pm8350c_gpios {
-	pmic_edp_bl_pwm: pmic-edp-bl-pwm-state {
-		pins = "gpio8";
-		function = "func1";
-		bias-disable;
-		qcom,drive-strength = <PMIC_GPIO_STRENGTH_LOW>;
-		/* Force backlight to be disabled to match state at boot. */
-		output-low;
-	};
-};
-
 &pm8350c_pwm {
 	status = "ok";
 };

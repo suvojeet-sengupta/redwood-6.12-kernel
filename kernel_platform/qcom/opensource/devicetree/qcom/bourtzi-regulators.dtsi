@@ -392,8 +392,7 @@
 			qcom,set = <RPMH_REGULATOR_SET_ALL>;
 			regulator-min-microvolt = <312000>;
 			regulator-max-microvolt = <752000>;
-			qcom,init-voltage = <752000>;
-			qcom,init-mode = <RPMH_REGULATOR_MODE_HPM>;
+			qcom,init-voltage = <348000>;
 		};
 	};
 
