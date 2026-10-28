@@ -532,6 +532,14 @@ static int wcd938x_tx_connect_port(struct snd_soc_component *component,
 	dev_dbg(component->dev, "%s slv_ch_idx: %d, mstr_ch_type: %d\n",
 		__func__, slave_ch_idx, ch_type);
 
+	/*
+	 * A channel whose ChMap the mixer paths left on ZERO has no master
+	 * port: connecting it fails and takes the whole TX power-up with it,
+	 * so the mic port never started. Leave it unconnected.
+	 */
+	if (slave_ch_idx != -EINVAL && !ch_type)
+		return 0;
+
 	if (enable)
 		ret = swr_connect_port(wcd938x->tx_swr_dev, &port_id,
 					num_port, &ch_mask, &ch_rate,
@@ -3191,32 +3199,39 @@ static const struct snd_kcontrol_new adc4_switch[] = {
 	SOC_DAPM_SINGLE("Switch", SND_SOC_NOPM, 0, 1, 0)
 };
 
+/*
+ * The AMICn_MIXER switches are new in this driver; 5.4 wired each AMIC
+ * straight to its ADC, and the vendor mixer paths never set them, so the
+ * ADCs had no input and the mic chain never powered up. Start them
+ * connected: a virtual DAPM switch takes its initial state from invert,
+ * and get/put still read and write 1 as connected.
+ */
 static const struct snd_kcontrol_new amic1_switch[] = {
-	SOC_DAPM_SINGLE("Switch", SND_SOC_NOPM, 0, 1, 0)
+	SOC_DAPM_SINGLE("Switch", SND_SOC_NOPM, 0, 1, 1)
 };
 
 static const struct snd_kcontrol_new amic2_switch[] = {
-	SOC_DAPM_SINGLE("Switch", SND_SOC_NOPM, 0, 1, 0)
+	SOC_DAPM_SINGLE("Switch", SND_SOC_NOPM, 0, 1, 1)
 };
 
 static const struct snd_kcontrol_new amic3_switch[] = {
-	SOC_DAPM_SINGLE("Switch", SND_SOC_NOPM, 0, 1, 0)
+	SOC_DAPM_SINGLE("Switch", SND_SOC_NOPM, 0, 1, 1)
 };
 
 static const struct snd_kcontrol_new amic4_switch[] = {
-	SOC_DAPM_SINGLE("Switch", SND_SOC_NOPM, 0, 1, 0)
+	SOC_DAPM_SINGLE("Switch", SND_SOC_NOPM, 0, 1, 1)
 };
 
 static const struct snd_kcontrol_new amic5_switch[] = {
-	SOC_DAPM_SINGLE("Switch", SND_SOC_NOPM, 0, 1, 0)
+	SOC_DAPM_SINGLE("Switch", SND_SOC_NOPM, 0, 1, 1)
 };
 
 static const struct snd_kcontrol_new amic6_switch[] = {
-	SOC_DAPM_SINGLE("Switch", SND_SOC_NOPM, 0, 1, 0)
+	SOC_DAPM_SINGLE("Switch", SND_SOC_NOPM, 0, 1, 1)
 };
 
 static const struct snd_kcontrol_new amic7_switch[] = {
-	SOC_DAPM_SINGLE("Switch", SND_SOC_NOPM, 0, 1, 0)
+	SOC_DAPM_SINGLE("Switch", SND_SOC_NOPM, 0, 1, 1)
 };
 
 static const struct snd_kcontrol_new va_amic1_switch[] = {
