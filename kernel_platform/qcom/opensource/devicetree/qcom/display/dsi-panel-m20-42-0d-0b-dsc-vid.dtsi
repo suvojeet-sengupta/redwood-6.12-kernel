@@ -34,9 +34,11 @@
 			<14500 15500 32000 17000 15500 30000 8000 3000>;
 		qcom,mdss-dsi-panel-peak-brightness = <4200000>;
 		qcom,mdss-dsi-panel-blackness-level = <3230>;
-		qcom,mdss-dsi-pan-enable-dynamic-fps;
-		qcom,mdss-dsi-pan-fps-update = "dfps_immediate_porch_mode_vfp";
-		qcom,dsi-supported-dfps-list = <120 90 60>;
+		/*
+		 * No dynamic fps: on 6.12 the first porch switch away from
+		 * 120 Hz leaves the DSI host in a FIFO overflow/underflow storm
+		 * that lasts until reboot. Stay at the panel's 120 Hz.
+		 */
 
 		qcom,mdss-dsi-display-timings {
 			timing@0 {
