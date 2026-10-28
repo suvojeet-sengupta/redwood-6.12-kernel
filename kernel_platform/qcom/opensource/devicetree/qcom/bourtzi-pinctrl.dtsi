@@ -328,7 +328,7 @@
 				pins = "gpio10", "gpio11",
 					"gpio12", "gpio13";
 				drive-strength = <2>;
-				bias-disable;
+				bias-pull-down;
 			};
 		};
 	};

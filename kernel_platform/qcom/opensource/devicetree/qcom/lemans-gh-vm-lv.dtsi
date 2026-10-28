@@ -57,6 +57,11 @@
 			no-map;
 		};
 
+		glink_cma_mem: glink_cma_region {
+			no-map;
+			qcom,label = <0x150>;
+		};
+
 		tlmm_shared_iomem: tlmm_sh_iomem {
 			no-map;
 			qcom,label = <0x7E>;
@@ -75,6 +80,20 @@
 		qupv3_2_shared_iomem: qupv3_2_sh_iomem {
 			no-map;
 			qcom,label = <0x81>;
+		};
+
+		cp_pixel_mem: cp_pixel_region {
+			no-map;
+			qcom,label = <0xD0A>;
+			qcom,target-vmid = <0xa>;
+			qcom,unmapped;
+		};
+
+		system_secure_mem: system_secure_region {
+			no-map;
+			qcom,label = <0xD09>;
+			qcom,target-vmid = <0x9>;
+			qcom,unmapped;
 		};
 	};
 
@@ -307,17 +326,22 @@
 		qcom,secdomain-ids = <53>;
 		qcom,primary-vm-index = <0>;
 		vm-attrs = "guest-ram-dump", "vpm-virq", "allow-unprotected";
+		qcom,peripheral-vmids = <0x9 0xa>;
 
 		/* Pass through regions */
 		iomemory-ranges = <
 			/* 2nd UFS iomemory region */
 			0x0 0x1DA4000 0x0 0x1DA4000 0x0 0x3000 0x0
+			/* MPROC NS2 IPCC region */
+			0x0 0x422000 0x0 0x422000 0x0 0x1000 0x0
 		>;
 
 		/* Pass through IRQs */
 		gic-irq-ranges = <
 			/* 2nd UFS IRQ  */
 			157 157
+			/* MPROC NS2 IPCC GIC IRQ */
+			592 592
 		>;
 
 		memory {
@@ -1130,6 +1154,7 @@
 
 	qcom_dma_heaps: qcom,dma-heaps {
 		compatible = "qcom,dma-heaps";
+		qcom,hgy-secure-heap;
 
 		qcom,qseecom {
 			qcom,dma-heap-name = "qcom,qseecom";
@@ -1142,12 +1167,40 @@
 			qcom,dma-heap-type = <HEAP_TYPE_CMA>;
 			memory-region = <&qseecom_ta_mem>;
 		};
+
+		qcom-cp-pixel {
+			qcom,dma-heap-name = "qcom,secure-pixel";
+			qcom,dma-heap-type = <HEAP_TYPE_SECURE_CARVEOUT>;
+			qcom,token = <0x80000>;
+			memory-region = <&cp_pixel_mem>;
+		};
+
+		qcom-cp-bitstream {
+			qcom,dma-heap-name = "system-secure";
+			qcom,dma-heap-type = <HEAP_TYPE_SECURE_CARVEOUT>;
+			qcom,token = <0x40000>;
+			memory-region = <&system_secure_mem>;
+		};
+	};
+
+	ipcc_mproc_apps_ns2: qcom,ipcc@422000 {
+		compatible = "qcom,ipcc";
+		reg = <0x422000 0x1000>;
+		interrupts = <GIC_SPI 560 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-controller;
+		#interrupt-cells = <3>;
+		#mbox-cells = <2>;
 	};
 
 	qcom,mem-buf {
 		compatible = "qcom,mem-buf";
 		qcom,mem-buf-capabilities = "consumer";
 		qcom,vmid = <53>;
+	};
+
+	qcom,mem-buf-msgq {
+		compatible = "qcom,mem-buf-msgq";
+		qcom,msgq-names = "trusted_vm";
 	};
 
 	qtee_shmbridge {

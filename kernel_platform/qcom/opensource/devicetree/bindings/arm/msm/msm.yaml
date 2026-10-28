@@ -173,6 +173,36 @@ properties:
               - qcom,rumi
           - const: qcom,waipiop
 
+      - description: Qualcomm Technologies, Inc. Diwali
+        items:
+          - enum:
+              - qcom,diwali-atp
+              - qcom,atp
+              - qcom,diwali-cdp
+              - qcom,cdp
+              - qcom,diwali-mtp
+              - qcom,mtp
+              - qcom,diwali-qrd
+              - qcom,qrd
+              - qcom,diwali-rumi
+              - qcom,rumi
+          - const: qcom,diwali
+
+      - description: Qualcomm Technologies, Inc. Diwalip
+        items:
+          - enum:
+              - qcom,diwalip-atp
+              - qcom,atp
+              - qcom,diwalip-cdp
+              - qcom,cdp
+              - qcom,diwalip-mtp
+              - qcom,mtp
+              - qcom,diwalip-qrd
+              - qcom,qrd
+              - qcom,diwalip-rumi
+              - qcom,rumi
+          - const: qcom,diwalip
+
       - description: Qualcomm Technologies, Inc. Chora
         items:
           - enum:
@@ -394,6 +424,10 @@ properties:
           - enum:
               - qcom,x1p42100-crd
               - qcom,crd
+              - qcom,x1p42100-qcb
+              - qcom,qcb
+              - qcom,x1p42100-cdp
+              - qcom,cdp
           - const: qcom,x1p42100
 
       - description: Qualcomm Technologies, Inc. sa8155
@@ -533,6 +567,12 @@ properties:
           - enum:
               - qcom,mahua-crd
               - qcom,crd
+              - qcom,mahua-qcb
+              - qcom,qcb
+              - qcom,mahua-idp
+              - qcom,idp
+              - qcom,mahua-rcm
+              - qcom,rcm
           - const: qcom,mahua
 
       - description: Qualcomm Technologies, Inc. PIKACHU

@@ -3,7 +3,6 @@
 
 # Subdirectories
 obj-y += dwc3/
-obj-y += extcon/
 obj-y += gadget/function/
 obj-y += misc/
 obj-y += pd/

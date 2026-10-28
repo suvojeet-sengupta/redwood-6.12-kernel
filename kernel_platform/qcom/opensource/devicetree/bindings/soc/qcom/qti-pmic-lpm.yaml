@@ -20,8 +20,8 @@ properties:
   compatible:
     items:
       - enum:
-          - qti,pmic-lpm
-          - qti,pmw6100-pmic-lpm
+          - qcom,pmic-lpm
+          - qcom,pmw6100-pmic-lpm
 
   reg:
     description: Base address of the SDAM peripheral.
@@ -44,7 +44,7 @@ examples:
         #size-cells = <0>;
 
         pmic-lpm@7200 {
-          compatible = "qti,pmic-lpm";
+          compatible = "qcom,pmic-lpm";
           reg = <0x7200>;
           #address-cells = <1>;
           #size-cells = <1>;

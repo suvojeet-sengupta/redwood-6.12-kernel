@@ -22,6 +22,12 @@
 			memory-region = <&qseecom_ta_mem>;
 		};
 
+		qcom,audio_ml {
+			qcom,dma-heap-name = "qcom,audio-ml";
+			qcom,dma-heap-type = <HEAP_TYPE_CMA>;
+			memory-region = <&audio_cma_mem>;
+		};
+
 		non_secure_display_dma_buf: qcom,display {
 			qcom,dma-heap-name = "qcom,display";
 			qcom,dma-heap-type = <HEAP_TYPE_CMA>;

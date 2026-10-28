@@ -3091,6 +3091,33 @@
 				input-enable;
 			};
 		};
+
+		usb3phy_portselect_default_2: usb3phy_portselect_default_2 {
+			mux {
+				pins = "gpio125";
+				function = "usb2_phy";
+			};
+
+			config {
+				pins = "gpio125";
+				bias-pull-down;
+				drive-strength = <2>;
+			};
+		};
+
+		usb3phy_portselect_gpio_2: usb3phy_portselect_gpio_2 {
+			mux {
+				pins = "gpio125";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio125";
+				drive-strength = <2>;
+				bias-pull-down;
+				input-enable;
+			};
+		};
 	};
 
 	i2s0_ws {

@@ -211,6 +211,26 @@
 			};
 		};
 	};
+
+	connector@2 {
+		compatible = "usb-c-connector";
+		reg = <2>;
+		power-role = "dual";
+		data-role = "dual";
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+
+				pmic_glink_port2_hs_in: endpoint {
+					remote-endpoint = <&usb_port2_hs_in>;
+				};
+			};
+		};
+	};
 };
 
 &smb2360_0_eusb2_repeater {
@@ -330,4 +350,38 @@
 		<&tcsrcc TCSR_USB3_MP1_CLKREF_EN>;
 	clock-names = "ref_clk_src",
 			"ref";
+};
+
+&smb2360_2_eusb2_repeater {
+	vdd18-supply = <&L3D>;
+	vdd3-supply = <&L8B>;
+};
+
+&usb2_phy_2 {
+	phys = <&smb2360_2_eusb2_repeater>;
+	/* default disabled;status inherited "okay" from hamoa_la.dtsi base */
+};
+
+&usb3_phy_2 {
+	/* default disabled;status inherited "okay" from hamoa_la.dtsi base */
+};
+
+&usb2 {
+	/* default disabled;status inherited "okay" from hamoa_la.dtsi base */
+	usb-role-switch;
+	pinctrl-names = "default";
+	pinctrl-0 = <&usb3phy_portselect_gpio_2>;
+	gpios = <&tlmm 125 0>;
+};
+
+&usb_port2_hs_in {
+	remote-endpoint = <&pmic_glink_port2_hs_in>;
+};
+
+&usb_port2_ssphy_out {
+	remote-endpoint = <&usb_port2_dwc3_ss>;
+};
+
+&usb_port2_dwc3_ss {
+	remote-endpoint = <&usb_port2_ssphy_out>;
 };

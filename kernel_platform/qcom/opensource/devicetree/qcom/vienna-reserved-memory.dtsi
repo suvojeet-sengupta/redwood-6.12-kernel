@@ -198,6 +198,11 @@
 		reg = <0x0 0xd82e0000 0x0 0x520000>;
 	};
 
+	dump_debug_mem: dump_debug_region@c8200000 {
+		no-map;
+		reg = <0x0 0xc8200000 0x0 0xa00000>;
+	};
+
 	va_md_mem: va_md_mem_region {
 		compatible = "shared-dma-pool";
 		alloc-ranges = <0x0 0x00000000 0x0 0xffffffff>;

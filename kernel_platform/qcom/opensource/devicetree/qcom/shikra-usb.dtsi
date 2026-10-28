@@ -47,6 +47,7 @@
 		qcom,interconnect-values-svs = /* SVS Votes */
 			<240000 700000>,
 			<0 40000>;
+		qcom,default-bus-vote = <2>;
 
 		extcon = <&eud>;
 		dummy-supply = <&apps_smmu>;

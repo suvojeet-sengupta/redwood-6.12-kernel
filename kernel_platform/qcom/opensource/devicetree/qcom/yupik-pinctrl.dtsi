@@ -1368,7 +1368,7 @@
 				};
 			};
 
-			qupv3_se10_2uart_tx_active: qupv3_se6_2uart_tx_active {
+			qupv3_se10_2uart_tx_active: qupv3_se10_2uart_tx_active {
 				mux {
 					pins = "gpio42";
 					function = "qup12";
@@ -1381,7 +1381,7 @@
 				};
 			};
 
-			qupv3_se10_2uart_rx_active: qupv3_se6_2uart_rx_active {
+			qupv3_se10_2uart_rx_active: qupv3_se10_2uart_rx_active {
 				mux {
 					pins = "gpio43";
 					function = "qup12";
@@ -1401,7 +1401,7 @@
 				};
 
 				config {
-					pins = "gpio42", "gpio31";
+					pins = "gpio42", "gpio43";
 					drive-strength = <2>;
 					bias-pull-down;
 				};

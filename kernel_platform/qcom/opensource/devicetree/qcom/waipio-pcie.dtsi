@@ -6,37 +6,32 @@
 #include <dt-bindings/clock/qcom,gcc-sm8450.h>
 
 &soc {
-	pcie0: qcom,pcie@1c00000 {
+	pcie0: pcie@1c00000 {
 		compatible = "qcom,pci-msm";
+		device_type = "pci";
 
 		reg = <0x01c00000 0x3000>,
 			<0x01c06000 0x2000>,
-			<0x60000000 0xf1d>,
+			<0x60000000 0x300000>,
 			<0x60000f20 0xa8>,
-			<0x60001000 0x1000>,
-			<0x60100000 0x100000>;
-		reg-names = "parf", "phy", "dm_core", "elbi", "iatu", "conf";
+			<0x60001000 0x1000>;
+		reg-names = "parf", "phy", "dm_core", "elbi", "iatu";
 
 		cell-index = <0>;
 		linux,pci-domain = <0>;
-
+		bus-range = <0x0 0x1>;
 		#address-cells = <3>;
 		#size-cells = <2>;
-		ranges = <0x01000000 0x0 0x60200000 0x60200000 0x0 0x100000>,
-			<0x02000000 0x0 0x60300000 0x60300000 0x0 0x3d00000>;
+		ranges = <0x01000000 0x0 0x60300000 0x60300000 0x0 0x100000>,
+			<0x02000000 0x0 0x60400000 0x60400000 0x0 0x3c00000>;
 
-		interrupt-parent = <&pcie0>;
-		interrupts = <0 1 2 3 4>;
+		interrupts = <GIC_SPI 140 IRQ_TYPE_LEVEL_HIGH
+				GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
+				GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH
+				GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH
+				GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-names = "int_global_int", "int_a", "int_b", "int_c",
 				"int_d";
-		#interrupt-cells = <1>;
-		interrupt-map-mask = <0 0 0 0xffffffff>;
-
-		interrupt-map = <0 0 0 0 &intc GIC_SPI 140 IRQ_TYPE_LEVEL_HIGH
-				0 0 0 1 &intc GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH
-				0 0 0 2 &intc GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH
-				0 0 0 3 &intc GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH
-				0 0 0 4 &intc GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>;
 
 		msi-map = <0x0 &gic_its 0x5980 0x1>, /* ITS IRQ 0x5980 */
 			<0x100 &gic_its 0x5981 0x20>; /* ITS IRQ 0x5981 - 0x59a1 */
@@ -51,12 +46,12 @@
 				&pcie0_clkreq_sleep
 				&pcie0_wake_default>;
 
-		gdsc-vdd-supply = <&gcc_pcie_0_gdsc>;
-		vreg-1p8-supply = <&pm8350_l6>;
+		gdsc-core-vdd-supply = <&gcc_pcie_0_gdsc>;
+		vreg-1p2-supply = <&pm8350_l6>;
 		vreg-0p9-supply = <&pm8350_l5>;
 		vreg-cx-supply = <&VDD_CX_LEVEL>;
 		vreg-mx-supply = <&VDD_MXA_LEVEL>;
-		qcom,vreg-1p8-voltage-level = <1200000 1200000 18200>;
+		qcom,vreg-1p2-voltage-level = <1200000 1200000 18200>;
 		qcom,vreg-0p9-voltage-level = <880000 880000 80900>;
 		qcom,vreg-cx-voltage-level = <RPMH_REGULATOR_LEVEL_MAX
 						RPMH_REGULATOR_LEVEL_NOM 0>;
@@ -91,19 +86,22 @@
 			<&gcc GCC_AGGRE_NOC_PCIE_0_AXI_CLK>,
 			<&gcc GCC_AGGRE_NOC_PCIE_1_AXI_CLK>,
 			<&gcc GCC_PCIE_0_PIPE_CLK_SRC>,
-			<&gcc PCIE_0_PIPE_CLK>;
-		clock-names = "pcie_0_pipe_clk", "pcie_0_ref_clk_src",
-				"pcie_0_aux_clk", "pcie_0_cfg_ahb_clk",
-				"pcie_0_mstr_axi_clk", "pcie_0_slv_axi_clk",
-				"pcie_0_ldo", "pcie_0_slv_q2a_axi_clk",
-				"pcie_phy_refgen_clk",
+			<&pcie_0_pipe_clk>;
+		clock-names = "pcie_pipe_clk", "pcie_ref_clk_src",
+				"pcie_aux_clk", "pcie_cfg_ahb_clk",
+				"pcie_mstr_axi_clk", "pcie_slv_axi_clk",
+				"pcie_ldo", "pcie_slv_q2a_axi_clk",
+				"pcie_rate_change_clk",
 				"pcie_ddrss_sf_tbu_clk",
 				"pcie_aggre_noc_0_axi_clk",
 				"pcie_aggre_noc_1_axi_clk", "pcie_pipe_clk_mux",
 				"pcie_pipe_clk_ext_src";
-		max-clock-frequency-hz = <0>, <0>, <0>, <19200000>, <0>, <0>,
-					<0>, <0>, <0>, <0>, <0>, <100000000>,
-					<0>, <0>, <0>, <0>;
+		qcom,pcie-clock-frequency = <0>, <0>, <19200000>, <0>, <0>,
+					<0>, <0>, <0>, <100000000>, <0>, <0>,
+					<0>, <0>, <0>;
+
+		clock-suppressible = <0>, <0>, <0>, <0>, <0>, <0>, <1>, <0>,
+				<0>, <0>, <0>, <0>, <0>, <0>;
 
 		resets = <&gcc GCC_PCIE_0_BCR>,
 			<&gcc GCC_PCIE_0_PHY_BCR>;
@@ -117,12 +115,11 @@
 
 		qcom,boot-option = <0x1>;
 		qcom,aux-clk-freq = <20>; /* 19.2 MHz */
-		qcom,drv-supported;
+		qcom,drv-name = "lpass";
 		qcom,no-l0s-supported;
 		qcom,drv-l1ss-timeout-us = <5000>;
 		qcom,l1-2-th-scale = <2>;
 		qcom,l1-2-th-value = <150>;
-		qcom,slv-addr-space-size = <0x4000000>;
 		qcom,ep-latency = <10>;
 		qcom,num-parf-testbus-sel = <0xb9>;
 		qcom,config-recovery;
@@ -273,36 +270,32 @@
 		status = "disabled";
 	};
 
-	pcie1: qcom,pcie@1c08000 {
+	pcie1: pcie@1c08000 {
 		compatible = "qcom,pci-msm";
+		device_type = "pci";
 
 		reg = <0x01c08000 0x3000>,
 			<0x01c0e000 0x2000>,
-			<0x40000000 0xf1d>,
+			<0x40000000 0x300000>,
 			<0x40000f20 0xa8>,
-			<0x40001000 0x1000>,
-			<0x40100000 0x100000>;
-		reg-names = "parf", "phy", "dm_core", "elbi", "iatu", "conf";
+			<0x40001000 0x1000>;
+		reg-names = "parf", "phy", "dm_core", "elbi", "iatu";
 
 		cell-index = <1>;
 		linux,pci-domain = <1>;
-
+		bus-range = <0x0 0x1>;
 		#address-cells = <3>;
 		#size-cells = <2>;
-		ranges = <0x01000000 0x0 0x40200000 0x40200000 0x0 0x100000>,
-			<0x02000000 0x0 0x40300000 0x40300000 0x0 0x1fd00000>;
+		ranges = <0x01000000 0x0 0x40300000 0x40300000 0x0 0x100000>,
+			<0x02000000 0x0 0x40400000 0x40400000 0x0 0x1fc00000>;
 
-		interrupt-parent = <&pcie1>;
-		interrupts = <0 1 2 3 4>;
+		interrupts = <GIC_SPI 306 IRQ_TYPE_LEVEL_HIGH
+				GIC_SPI 434 IRQ_TYPE_LEVEL_HIGH
+				GIC_SPI 435 IRQ_TYPE_LEVEL_HIGH
+				GIC_SPI 438 IRQ_TYPE_LEVEL_HIGH
+				GIC_SPI 439 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-names = "int_global_int", "int_a", "int_b", "int_c",
 				"int_d";
-		#interrupt-cells = <1>;
-		interrupt-map-mask = <0 0 0 0xffffffff>;
-		interrupt-map = <0 0 0 0 &intc GIC_SPI 306 IRQ_TYPE_LEVEL_HIGH
-				0 0 0 1 &intc GIC_SPI 434 IRQ_TYPE_LEVEL_HIGH
-				0 0 0 2 &intc GIC_SPI 435 IRQ_TYPE_LEVEL_HIGH
-				0 0 0 3 &intc GIC_SPI 438 IRQ_TYPE_LEVEL_HIGH
-				0 0 0 4 &intc GIC_SPI 439 IRQ_TYPE_LEVEL_HIGH>;
 
 		msi-parent = <&pcie1_msi>;
 
@@ -316,15 +309,15 @@
 				&pcie1_clkreq_sleep
 				&pcie1_wake_default>;
 
-		gdsc-vdd-supply = <&gcc_pcie_1_gdsc>;
-		vreg-1p8-supply = <&pm8350_l6>;
+		gdsc-core-vdd-supply = <&gcc_pcie_1_gdsc>;
+		vreg-1p2-supply = <&pm8350_l6>;
 		vreg-0p9-supply = <&pm8450_l2>;
 		vreg-qref-supply = <&pm8350_l5>;
 		vreg-cx-supply = <&VDD_CX_LEVEL>;
 		vreg-mx-supply = <&VDD_MXA_LEVEL>;
 		qcom,target-link-speed = <3>; /* Set max link speed to Gen3 */
 
-		qcom,vreg-1p8-voltage-level = <1200000 1200000 26100>;
+		qcom,vreg-1p2-voltage-level = <1200000 1200000 26100>;
 		qcom,vreg-0p9-voltage-level = <912000 912000 193000>;
 		qcom,vreg-cx-voltage-level = <RPMH_REGULATOR_LEVEL_MAX
 						RPMH_REGULATOR_LEVEL_LOW_SVS 0>;
@@ -362,19 +355,22 @@
 			<&gcc PCIE_1_PIPE_CLK>,
 			<&gcc GCC_PCIE_1_PHY_AUX_CLK>,
 			<&gcc GCC_PCIE_1_PHY_AUX_CLK_SRC>,
-			<&gcc PCIE_1_PHY_AUX_CLK>;
-		clock-names = "pcie_1_pipe_clk", "pcie_1_ref_clk_src",
-				"pcie_1_aux_clk", "pcie_1_cfg_ahb_clk",
-				"pcie_1_mstr_axi_clk", "pcie_1_slv_axi_clk",
-				"pcie_1_ldo", "pcie_1_slv_q2a_axi_clk",
-				"pcie_phy_refgen_clk",
+			<&pcie_1_pipe_clk>;
+		clock-names = "pcie_pipe_clk", "pcie_ref_clk_src",
+				"pcie_aux_clk", "pcie_cfg_ahb_clk",
+				"pcie_mstr_axi_clk", "pcie_slv_axi_clk",
+				"pcie_ldo", "pcie_slv_q2a_axi_clk",
+				"pcie_rate_change_clk",
 				"pcie_ddrss_sf_tbu_clk",
 				"pcie_aggre_noc_1_axi_clk", "pcie_pipe_clk_mux",
 				"pcie_pipe_clk_ext_src", "pcie_phy_aux_clk",
 				"pcie_phy_aux_clk_mux", "pcie_phy_aux_clk_ext_src";
-		max-clock-frequency-hz = <0>, <0>, <0>, <19200000>, <0>, <0>,
-					<0>, <0>, <0>, <0>, <0>, <100000000>,
-					<0>, <0>, <0>, <0>, <0>, <0>;
+		qcom,pcie-clock-frequency = <0>, <0>, <19200000>, <0>, <0>,
+					<0>, <0>, <0>, <100000000>, <0>, <0>,
+					<0>, <0>, <0>, <0>, <0>;
+
+		clock-suppressible = <0>, <0>, <0>, <0>, <0>, <0>, <1>, <0>,
+				<0>, <0>, <0>, <0>, <0>, <0>, <0>, <0>;
 
 		resets = <&gcc GCC_PCIE_1_BCR>,
 			<&gcc GCC_PCIE_1_PHY_BCR>;
@@ -387,11 +383,10 @@
 			<0x100 &apps_smmu 0x1c81 0x1>;
 
 		qcom,boot-option = <0x1>;
-		qcom,drv-supported;
+		qcom,drv-name = "lpass";
 		qcom,drv-l1ss-timeout-us = <5000>;
 		qcom,aux-clk-freq = <17>; /* 16.6 MHz */
 		qcom,eq-fmdc-t-min-phase23 = <1>;
-		qcom,slv-addr-space-size = <0x20000000>;
 		qcom,ep-latency = <10>;
 		qcom,num-parf-testbus-sel = <0xb9>;
 		qcom,l1-2-th-scale = <2>;

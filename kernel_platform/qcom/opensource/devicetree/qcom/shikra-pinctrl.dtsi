@@ -8,13 +8,18 @@
 	tlmm: pinctrl@0x400000 {
 		compatible = "qcom,shikra-tlmm";
 		reg = <0x400000 0x800000>;
-		interrupts = <GIC_SPI 227 IRQ_TYPE_LEVEL_HIGH>;
+		interrupts = <GIC_SPI 227 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 235 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 236 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 237 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 238 IRQ_TYPE_LEVEL_HIGH>;
 		gpio-controller;
 		#gpio-cells = <2>;
 		interrupt-controller;
 		#interrupt-cells = <2>;
 		wakeup-parent = <&mpm>;
 		qcom,gpios-reserved = <115 116 6 7 8 9 14 15 16 17 138>;
+		qcom,dirconn-list = <0xFFFFFFFF 0>, <0xFFFFFFFF 0>, <0xFFFFFFFF 0>, <0xFFFFFFFF 0>, <85 238>;
 
 		dmic_eldo_en_pin: dmic_eldo_en_pin {
 			dmic_eldo_en_pin_audio_active: dmic_eldo_en_pin_audio_active {

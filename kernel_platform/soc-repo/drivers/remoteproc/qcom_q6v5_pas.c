@@ -1280,6 +1280,39 @@ static inline int bus_bw_init(struct qcom_adsp *adsp)
 }
 #endif
 
+int hibernation_rproc_early_boot_ping(struct rproc *rproc)
+{
+	struct qcom_adsp *adsp;
+	struct platform_device *pdev;
+
+	if (!rproc || !rproc->priv)
+		return -EINVAL;
+
+	adsp = (struct qcom_adsp *)rproc->priv;
+	if (!adsp->q6v5.early_boot)
+		return 0;
+
+	if (!adsp || !adsp->dev)
+		return -EINVAL;
+
+	/*
+	 * early_boot requires detached state and get smem stage
+	 * before calling rproc_boot() on hibernation-exit path.
+	 */
+	adsp->rproc->state = RPROC_DETACHED;
+	pdev = to_platform_device(adsp->dev);
+	adsp->q6v5.ping_state = devm_qcom_smem_state_get(&pdev->dev,
+					 "ping", &adsp->q6v5.ping_bit);
+	if (IS_ERR(adsp->q6v5.ping_state)) {
+		dev_err(adsp->dev, "failed to acquire smem state %ld\n",
+				PTR_ERR(adsp->q6v5.ping_state));
+		return -ENODEV;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(hibernation_rproc_early_boot_ping);
+
 static int rproc_panic_handler(struct notifier_block *this,
 			      unsigned long event, void *ptr)
 {
@@ -2552,6 +2585,7 @@ static const struct adsp_data x1e80100_adsp_resource = {
 	.dtb_firmware_name = "adsp_dtb.mdt",
 	.pas_id = 1,
 	.dtb_pas_id = 0x24,
+	.lite_pas_id = 0x1f,
 	.minidump_id = 5,
 	.load_state = "adsp",
 	.ssr_name = "lpass",
@@ -3104,7 +3138,6 @@ static const struct adsp_data vienna_cdsp_resource = {
 	.region_assign_vmid = QCOM_SCM_VMID_CDSP,
 	.crash_reason_stack = 660,
 	.smem_host_id = 5,
-	.auto_boot = true,
 };
 
 static const struct adsp_data vienna_mpss_resource = {
@@ -3694,6 +3727,59 @@ static const struct adsp_data glymur_cdsp_resource = {
 	.smem_host_id = 5,
 };
 
+static const struct adsp_data waipio_adsp_resource = {
+	.crash_reason_smem = 423,
+	.firmware_name = "adsp.mdt",
+	.pas_id = 1,
+	.minidump_id = 5,
+	.load_state = "adsp",
+	.uses_elf64 = true,
+	.auto_boot = false,
+	.ssr_name = "lpass",
+	.sysmon_name = "adsp",
+	.ssctl_id = 0x14,
+};
+
+static const struct adsp_data waipio_cdsp_resource = {
+	.crash_reason_smem = 601,
+	.firmware_name = "cdsp.mdt",
+	.pas_id = 18,
+	.minidump_id = 7,
+	.load_state = "cdsp",
+	.uses_elf64 = true,
+	.auto_boot = true,
+	.ssr_name = "cdsp",
+	.sysmon_name = "cdsp",
+	.ssctl_id = 0x17,
+};
+
+static const struct adsp_data waipio_mpss_resource = {
+	.crash_reason_smem = 421,
+	.firmware_name = "modem.mdt",
+	.pas_id = 4,
+	.minidump_id = 3,
+	.load_state = "modem",
+	.uses_elf64 = true,
+	.auto_boot = false,
+	.ssr_name = "mpss",
+	.sysmon_name = "modem",
+	.ssctl_id = 0x12,
+	.dma_phys_below_32b = true,
+	.decrypt_shutdown = true,
+	.both_dumps = true,
+};
+
+static const struct adsp_data waipio_slpi_resource = {
+	.crash_reason_smem = 424,
+	.firmware_name = "slpi.mdt",
+	.pas_id = 12,
+	.load_state = "slpi",
+	.auto_boot = true,
+	.ssr_name = "dsps",
+	.sysmon_name = "slpi",
+	.ssctl_id = 0x16,
+};
+
 static const struct of_device_id adsp_of_match[] = {
 	{ .compatible = "qcom,msm8226-adsp-pil", .data = &adsp_resource_init},
 	{ .compatible = "qcom,msm8953-adsp-pil", .data = &msm8996_adsp_resource},
@@ -3814,6 +3900,10 @@ static const struct of_device_id adsp_of_match[] = {
 	{ .compatible = "qcom,bourtzi-modem-pas", .data = &bourtzi_mpss_resource},
 	{ .compatible = "qcom,glymur-adsp-pas", .data = &glymur_adsp_resource},
 	{ .compatible = "qcom,glymur-cdsp-pas", .data = &glymur_cdsp_resource},
+	{ .compatible = "qcom,waipio-adsp-pas", .data = &waipio_adsp_resource},
+	{ .compatible = "qcom,waipio-cdsp-pas", .data = &waipio_cdsp_resource},
+	{ .compatible = "qcom,waipio-slpi-pas", .data = &waipio_slpi_resource},
+	{ .compatible = "qcom,waipio-modem-pas", .data = &waipio_mpss_resource},
 	{ },
 };
 MODULE_DEVICE_TABLE(of, adsp_of_match);

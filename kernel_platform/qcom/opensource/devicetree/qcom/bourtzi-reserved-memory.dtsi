@@ -102,7 +102,7 @@
 
 	wpss_mem: wpss_region@85300000 {
 		no-map;
-		reg = <0x0 0x85300000 0x0 0x1900000>;
+		reg = <0x0 0x85300000 0x0 0x1500000>;
 	};
 
 	video_mem: video_region@86c00000 {

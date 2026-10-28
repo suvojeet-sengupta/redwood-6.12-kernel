@@ -244,11 +244,6 @@
 		label = "cont_splash_region";
 	};
 
-	lpai_display_region: lpai_display_region@ba200000 {
-		no-map;
-		reg = <0x0 0xba200000 0x0 0x4000000>;
-	};
-
 	/* UEFI region at 0xa7000000 is reclaimed by Linux */
 
 	/* Linux kernel image is loaded at 0xa8000000 */

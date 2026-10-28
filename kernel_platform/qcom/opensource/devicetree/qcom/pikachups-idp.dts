@@ -10,7 +10,7 @@
 / {
 	model = "Qualcomm Technologies, Inc. PikachuPS IDP";
 	compatible = "qcom,pikachups-idp", "qcom,pikachups", "qcom,idp";
-	qcom,board-id = <0x10022 0>;
+	qcom,board-id = <0x10022 0>, <0x10022 0x400>, <0x10022 0x500>;
 };
 
 

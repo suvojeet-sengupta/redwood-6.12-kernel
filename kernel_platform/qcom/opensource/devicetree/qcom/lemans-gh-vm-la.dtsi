@@ -396,8 +396,8 @@
 				0x0 0x40000000 0x0 0x40000000 0x0 0x100000 0x0
 				0x0 0x40100000 0x0 0x40100000 0x0 0x1ff00000 0x0
 				0x4 0x10100000 0x4 0x10100000 0x0 0x100000 0x0
-				/* EMAC1 CH4 region */
-				0x0 0x2300C000 0x0 0x2300C000 0x0 0x1000 0x0
+				/* EMAC0 CH4 region */
+				0x0 0x2304C000 0x0 0x2304C000 0x0 0x1000 0x0
 				/* USB2 region */
 				0x0 0xa400000 0x0 0xa400000 0x0 0x200000 0x0
 				0x0 0x88e7000 0x0 0x88e7000 0x0 0x1000 0x0
@@ -431,9 +431,9 @@
 			467 467
 			470 470
 			471 471
-			/* EMAC1 CH4 GIC IRQ */
-			808 808
-			860 860
+			/* EMAC0 CH4 GIC IRQ */
+			902 902
+			973 973
 			/* USB2 IRQs */
 			521 521
 			522 522
@@ -1753,20 +1753,20 @@
 
 
 	emac_iommu_region: emac-iommu-region {
-		iommu-addresses = <&emac1_hw 0x0 0x80000000>, <&emac1_hw 0xC0000000 0x40000000>;
+		iommu-addresses = <&emac0_hw 0x0 0x80000000>, <&emac0_hw 0xC0000000 0x40000000>;
 	};
 
-	emac1_hw: qcom,ethernet@2300C000 {
-		compatible = "qcom,stmmac-ethqos-emac1-gy";
+	emac0_hw: qcom,ethernet@2304C000 {
+		compatible = "qcom,stmmac-ethqos-emac-gy";
 		emac-core-version = <0x30010000>;
-		reg = <0x2300C000 0x1000>;
+		reg = <0x2304C000 0x1000>;
 		reg-names = "stmmaceth";
 
 		dma-coherent;
-		interrupts-extended = <&intc 0 776 1>, <&intc 0 828 1>;
+		interrupts-extended = <&intc 0 870 1>, <&intc 0 941 1>;
 		interrupt-names = "rx_ch0_intr", "tx_ch0_intr";
 
-		power-domains = <&scmi_power 9>;
+		power-domains = <&scmi_power 12>;
 		power-domain-names = "gvm_power_mdio";
 
 		snps,tso;
@@ -1778,10 +1778,11 @@
 		snps,mtl-tx-config = <&mtl_tx_setup>;
 		queue = <0>;
 
-		iommus = <&apps_smmu 0x148 0x1>;
+		iommus = <&apps_smmu 0x128 0x1>;
 		qcom,iommu-geometry = <0x80000000 0x40000000>;
 		memory-region = <&emac_iommu_region>;
 		qcom,iommu-dma = "fastmap";
+		status = "okay";
 	};
 };
 
