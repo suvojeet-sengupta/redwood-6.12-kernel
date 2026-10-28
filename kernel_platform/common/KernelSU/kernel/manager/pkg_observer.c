@@ -31,8 +31,10 @@ static void ksu_defer_track_throne(void)
 {
     struct callback_head *cb;
 
+#ifdef CONFIG_KSU_SUSFS
     // Renew the getpriority uid bitmap filter
     susfs_parse_priority_app_strings();
+#endif
 
     if (!(current->flags & PF_KTHREAD)) {
         cb = kzalloc(sizeof(*cb), GFP_KERNEL);
