@@ -1043,7 +1043,6 @@ static void msm_audio_remove_qos_request(void)
  	}
 }
 
-#if 0
 static void msm_audio_update_qos_request(u32 latency)
 {
 	int cpu = 0;
@@ -1073,7 +1072,6 @@ static void msm_audio_update_qos_request(u32 latency)
  		}
  	}
 }
-#endif
 
 static inline int param_is_mask(int p)
 {
@@ -5397,7 +5395,7 @@ static int msm_fe_qos_prepare(struct snd_pcm_substream *substream)
 
 	qos_client_active_cnt++;
 	if (qos_client_active_cnt == 1)
-		cpu_latency_qos_update_request(&substream->latency_pm_qos_req, MSM_LL_QOS_VALUE);
+		msm_audio_update_qos_request(MSM_LL_QOS_VALUE);
 
 	return 0;
 }
@@ -5409,7 +5407,7 @@ static void msm_fe_qos_shutdown(struct snd_pcm_substream *substream)
 	if (qos_client_active_cnt > 0)
 		qos_client_active_cnt--;
 	if (qos_client_active_cnt == 0)
-		cpu_latency_qos_update_request(&substream->latency_pm_qos_req, PM_QOS_DEFAULT_VALUE);
+		msm_audio_update_qos_request(PM_QOS_CPU_LATENCY_DEFAULT_VALUE);
 }
 
 void mi2s_disable_audio_vote(struct snd_pcm_substream *substream)
