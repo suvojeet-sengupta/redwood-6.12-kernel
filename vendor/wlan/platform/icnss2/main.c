@@ -1101,7 +1101,8 @@ static int icnss_setup_dms_mac(struct icnss_priv *priv)
 		goto qmi_send;
 
 	/* DTSI property use-nv-mac is used to force DMS MAC address for WLAN.
-	 * Thus assert on failure to get MAC from DMS even after retries
+	 * Without the modem there is no DMS: carry on with the firmware MAC
+	 * instead of taking the whole system down.
 	 */
 	if (priv->use_nv_mac) {
 		for (i = 0; i < ICNSS_DMS_QMI_CONNECTION_WAIT_RETRY; i++) {
@@ -1114,9 +1115,8 @@ static int icnss_setup_dms_mac(struct icnss_priv *priv)
 			msleep(ICNSS_DMS_QMI_CONNECTION_WAIT_MS);
 		}
 		if (!priv->dms.nv_mac_not_prov && !priv->dms.mac_valid) {
-			icnss_pr_err("Unable to get MAC from DMS after retries\n");
-			ICNSS_ASSERT(0);
-			return -EINVAL;
+			icnss_pr_err("Unable to get MAC from DMS after retries, using the firmware MAC\n");
+			return 0;
 		}
 	}
 qmi_send:

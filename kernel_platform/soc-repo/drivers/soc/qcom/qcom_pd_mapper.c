@@ -545,6 +545,8 @@ static const struct of_device_id qcom_pdm_domains[] __maybe_unused = {
 	{ .compatible = "qcom,sm8450", .data = sm8350_domains, },
 	{ .compatible = "qcom,sm8550", .data = sm8550_domains, },
 	{ .compatible = "qcom,sm8650", .data = sm8550_domains, },
+	{ .compatible = "qcom,sm7325", .data = sc7280_domains, },
+	{ .compatible = "qcom,yupik", .data = sc7280_domains, },
 	{},
 };
 
@@ -663,6 +665,7 @@ static void qcom_pdm_remove(struct auxiliary_device *auxdev)
 
 static const struct auxiliary_device_id qcom_pdm_table[] = {
 	{ .name = "qcom_common.pd-mapper" },
+	{ .name = "rproc_qcom_common.pd-mapper" },
 	{},
 };
 MODULE_DEVICE_TABLE(auxiliary, qcom_pdm_table);

@@ -43,7 +43,6 @@ struct  cam_sensor_query_cap {
 	__u32        ois_slot_id;
 	__u32        flash_slot_id;
 	__u32        csiphy_slot_id;
-	__u32        ir_led_slot_id;
 } __attribute__((packed));
 
 /**
@@ -214,7 +213,8 @@ struct cam_cmd_power {
  * @ cmd_type        :   Command buffer type
  * @ data_type       :   I2C data type
  * @ addr_type       :   I2C address type
- * @ frequency       :   Frequency setting for reg-data pairs
+ *
+ * The 5.4 layout, without frequency: redwood's CamX builds these headers.
  */
 struct i2c_rdwr_header {
 	__u32    count;
@@ -222,7 +222,6 @@ struct i2c_rdwr_header {
 	__u8     cmd_type;
 	__u8     data_type;
 	__u8     addr_type;
-	__u32    frequency;
 } __attribute__((packed));
 
 /**
@@ -298,8 +297,6 @@ struct cam_cmd_i2c_random_rd {
 struct cam_cmd_i2c_continuous_rd {
 	struct i2c_rdwr_header header;
 	__u32                  reg_addr;
-	__u32                  num_bytes;
-	struct cam_cmd_read    data_read[1];
 } __attribute__((packed));
 
 /**

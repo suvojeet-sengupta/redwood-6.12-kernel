@@ -45,7 +45,8 @@
  * It includes both session and device handles
  */
 #define CAM_REQ_MGR_MAX_HANDLES           64
-#define CAM_REQ_MGR_MAX_HANDLES_V2        128
+/* 256 as in 5.4: it sizes cam_req_mgr_link_info_v2, which CamX passes */
+#define CAM_REQ_MGR_MAX_HANDLES_V2        256
 #define MAX_LINKS_PER_SESSION             2
 
 /* V4L event type which user space will subscribe to */
