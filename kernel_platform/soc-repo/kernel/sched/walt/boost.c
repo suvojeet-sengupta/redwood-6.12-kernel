@@ -346,8 +346,24 @@ done:
 	return ret;
 }
 
+/*
+ * redwood: WALT boosts every task onto the big cores while the system boots
+ * and leaves turning that off to post_boot. The 5.4-era post_boot scripts of
+ * redwood ROMs never do, so drop the boot's reference ourselves once boot is
+ * surely over. A "0" from userspace before then has dropped it already.
+ */
+#define WALT_BOOT_BOOST_MS	60000
+
+static void walt_boot_boost_end(struct work_struct *work)
+{
+	sched_set_boost(FULL_THROTTLE_BOOST_DISABLE);
+}
+static DECLARE_DELAYED_WORK(walt_boot_boost_work, walt_boot_boost_end);
+
 void walt_boost_init(void)
 {
 	/* force call the callbacks for default boost */
 	sched_set_boost(FULL_THROTTLE_BOOST);
+	schedule_delayed_work(&walt_boot_boost_work,
+			      msecs_to_jiffies(WALT_BOOT_BOOST_MS));
 }
