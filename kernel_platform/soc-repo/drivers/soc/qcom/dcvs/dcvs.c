@@ -109,22 +109,13 @@ static ssize_t store_##name(struct kobject *kobj,			\
 	return count;							\
 }									\
 
-static ssize_t store_boost_freq(struct kobject *kobj,
-			struct attribute *attr, const char *buf,
-			size_t count)
+static int dcvs_set_boost_freq(struct dcvs_hw *hw, unsigned int val)
 {
-	int ret;
-	unsigned int val;
-	struct dcvs_hw *hw = to_dcvs_hw(kobj);
+	int ret = 0;
 	struct dcvs_path *path;
 	struct dcvs_voter *voter;
 	struct dcvs_freq new_freq;
 
-	ret = kstrtouint(buf, 10, &val);
-	if (ret < 0)
-		return ret;
-	if (val > hw->hw_max_freq)
-		return -EINVAL;
 	/* boost_freq only supported on hw with slow path */
 	path = hw->dcvs_paths[DCVS_SLOW_PATH];
 	if (!path)
@@ -152,8 +143,54 @@ static ssize_t store_boost_freq(struct kobject *kobj,
 	trace_qcom_dcvs_boost(hw->type, path->type, hw->boost_freq,
 				new_freq.ib, new_freq.ab);
 
+	return ret;
+}
+
+static ssize_t store_boost_freq(struct kobject *kobj,
+			struct attribute *attr, const char *buf,
+			size_t count)
+{
+	int ret;
+	unsigned int val;
+	struct dcvs_hw *hw = to_dcvs_hw(kobj);
+
+	ret = kstrtouint(buf, 10, &val);
+	if (ret < 0)
+		return ret;
+	if (val > hw->hw_max_freq)
+		return -EINVAL;
+
+	ret = dcvs_set_boost_freq(hw, val);
+	if (ret == -EPERM)
+		return ret;
+
 	return count;
 }
+
+/*
+ * The slow paths start boosted to their max for a faster boot, and the
+ * vendor's post_boot is expected to drop the boost. One written for 5.4,
+ * as on redwood, doesn't know these nodes: DDR, LLCC and L3 then stayed at
+ * max for good. End the boost a minute after boot unless userspace has set
+ * it itself.
+ */
+#define DCVS_BOOT_BOOST_MS	60000
+
+static void dcvs_boot_boost_end(struct work_struct *work)
+{
+	struct dcvs_hw *hw;
+	int i;
+
+	for (i = 0; i < NUM_DCVS_HW_TYPES; i++) {
+		hw = dcvs_data->hw_devs[i];
+		if (!hw || !hw->dcvs_paths[DCVS_SLOW_PATH] ||
+		    hw->boost_freq != hw->hw_max_freq)
+			continue;
+		if (!dcvs_set_boost_freq(hw, 0))
+			pr_info("dcvs: hw %d boot boost ended\n", i);
+	}
+}
+static DECLARE_DELAYED_WORK(dcvs_boot_boost_work, dcvs_boot_boost_end);
 
 static ssize_t show_cur_freq(struct kobject *kobj,
 				struct attribute *attr, char *buf)
@@ -849,8 +886,11 @@ static int qcom_dcvs_path_probe(struct platform_device *pdev)
 	hw->dcvs_paths[path_type] = path;
 	hw->num_inited_paths++;
 
-	if (qcom_dcvs_hw_and_paths_inited())
+	if (qcom_dcvs_hw_and_paths_inited() && !dcvs_data->inited) {
 		dcvs_data->inited = true;
+		schedule_delayed_work(&dcvs_boot_boost_work,
+				      msecs_to_jiffies(DCVS_BOOT_BOOST_MS));
+	}
 
 	return ret;
 }
