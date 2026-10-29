@@ -1074,8 +1074,28 @@ int si_object_do_invoke(struct si_object_invoke_ctx *oic,
 		/* SUCCESS. Release async request queued for this context.*/
 		__release__async_queued_reqs(oic);
 
+#if IS_ENABLED(CONFIG_QSEECOM_PROXY)
+		/*
+		 * A listener request goes to qseecom. Once the listener has
+		 * answered, QTEE may ask for a callback before it completes the
+		 * invocation (an app loader reading the app image, for one); that
+		 * is served below like any other callback. Returning instead
+		 * leaves QTEE waiting for the callback response, and every later
+		 * call, qseecom ones included, then gets -EBUSY.
+		 */
+		if (response_type == QSEOS_RESULT_INCOMPLETE ||
+		response_type == QSEOS_RESULT_BLOCKED_ON_LISTENER) {
+			ret = qseecom_process_listener_from_smcinvoke(result,
+				&response_type, &data);
+			if (ret)
+				pr_err("qseecom bridge failed with= %d\n", ret);
+			trace_qseecom_process_listener_from_smcinvoke_ret(response_type, *result,
+				ret);
+		}
+#endif
+
 		/* Is it not a callback request?! */
-		if (response_type == QTEE_RESULT_INBOUND_REQ_NEEDED) {
+		if (!ret && response_type == QTEE_RESULT_INBOUND_REQ_NEEDED) {
 			oic->flags |= OIC_FLAG_BUSY;
 
 			/* Before dispatching the request, handle any pending async requests. */
@@ -1084,18 +1104,6 @@ int si_object_do_invoke(struct si_object_invoke_ctx *oic,
 			si_object_invoke(oic, cb_msg);
 
 		} else {
-#if IS_ENABLED(CONFIG_QSEECOM_PROXY)
-			if (response_type == QSEOS_RESULT_INCOMPLETE ||
-			response_type == QSEOS_RESULT_BLOCKED_ON_LISTENER) {
-				ret = qseecom_process_listener_from_smcinvoke(result,
-					&response_type, &data);
-				if (ret)
-					pr_err("qseecom bridge failed with= %d\n", ret);
-			}
-			trace_qseecom_process_listener_from_smcinvoke_ret(response_type, *result,
-				ret);
-#endif
-
 			if (!*result) {
 				ret = update_args(u, oic);
 				if (ret) {
