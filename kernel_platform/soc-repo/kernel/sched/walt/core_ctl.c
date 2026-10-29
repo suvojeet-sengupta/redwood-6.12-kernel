@@ -17,6 +17,7 @@
 #include <uapi/linux/sched/types.h>
 #include <linux/sched/walt.h>
 #include <linux/kstrtox.h>
+#include <linux/moduleparam.h>
 
 #include "walt.h"
 #include "trace.h"
@@ -96,6 +97,15 @@ static void sysfs_param_changed(struct cluster_data *state);
 static void wake_up_core_ctl_thread(void);
 static bool initialized;
 static bool assist_params_initialized;
+
+/*
+ * redwood: core control pauses idle big cores outright, which users see as
+ * cores switched off and pay for in wake-up latency, and the 5.4 perf HAL
+ * turns it on for gold. Idle cores already sleep in their idle states, so
+ * keep it off whatever userspace asks unless this is set.
+ */
+static bool core_ctl_allowed;
+module_param(core_ctl_allowed, bool, 0644);
 
 ATOMIC_NOTIFIER_HEAD(core_ctl_notifier);
 static unsigned int last_nr_big;
@@ -292,7 +302,7 @@ static ssize_t store_enable(struct cluster_data *state,
 	if (sscanf(buf, "%u\n", &val) != 1)
 		return -EINVAL;
 
-	bval = !!val;
+	bval = !!val && core_ctl_allowed;
 	if (bval != state->enable) {
 		state->enable = bval;
 		sysfs_param_changed(state);
