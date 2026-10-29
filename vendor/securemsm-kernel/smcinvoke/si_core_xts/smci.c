@@ -1179,9 +1179,145 @@ static struct si_object_operations cbo_sio_ops = {
  *   - 'root_fops'.
  */
 
+/*
+ * redwood: its vendor userspace (QSEE clients, Widevine's OEMCrypto, the
+ * feature enabler) was built against the 5.4 driver, whose structs are
+ * narrower: 32-bit callback server fds, txn ids, callback object ids and
+ * callback buffer sizes, and no reserved fields. Every call then failed with
+ * ENOTTY, so Widevine fell back to L3. The ioctl numbers encode the struct
+ * sizes, so the old calls are told apart by number and their structs and
+ * argument arrays translated here.
+ */
+struct smcinvoke_obj_v1 {
+	__s64 fd;
+	__s32 cb_server_fd;
+	__s32 reserved;
+};
+
+union smcinvoke_arg_v1 {
+	struct smcinvoke_buf b;
+	struct smcinvoke_obj_v1 o;
+};
+
+struct smcinvoke_cmd_req_v1 {
+	__u32 op;
+	__u32 counts;
+	__s32 result;
+	__u32 argsize;
+	__u64 args;
+};
+
+struct smcinvoke_accept_v1 {
+	__u32 has_resp;
+	__u32 txn_id;
+	__s32 result;
+	__s32 cbobj_id;
+	__u32 op;
+	__u32 counts;
+	__s32 reserved;
+	__u32 argsize;
+	__u64 buf_len;
+	__u64 buf_addr;
+};
+
+struct smcinvoke_server_v1 {
+	__u32 cb_buf_size;
+};
+
+#define SMCINVOKE_IOCTL_INVOKE_REQ_V1 \
+	_IOWR(SMCINVOKE_IOC_MAGIC, 1, struct smcinvoke_cmd_req_v1)
+#define SMCINVOKE_IOCTL_ACCEPT_REQ_V1 \
+	_IOWR(SMCINVOKE_IOC_MAGIC, 2, struct smcinvoke_accept_v1)
+#define SMCINVOKE_IOCTL_SERVER_REQ_V1 \
+	_IOWR(SMCINVOKE_IOC_MAGIC, 3, struct smcinvoke_server_v1)
+
+/*
+ * Buffers have the same layout in both ABIs; objects don't, and the
+ * callback server fd must keep its sign (-1 is common). Arguments come
+ * buffers first, so the first nbufs are buffers and the rest objects.
+ */
+static void smci_args_from_v1(union smcinvoke_arg *d,
+			      const union smcinvoke_arg_v1 *s, int n, int nbufs)
+{
+	int i;
+
+	for (i = 0; i < n; i++) {
+		memset(&d[i], 0, sizeof(d[i]));
+		if (i < nbufs) {
+			d[i].b = s[i].b;
+		} else {
+			d[i].o.fd = s[i].o.fd;
+			d[i].o.cb_server_fd = s[i].o.cb_server_fd;
+			d[i].o.reserved = s[i].o.reserved;
+		}
+	}
+}
+
+static void smci_args_to_v1(union smcinvoke_arg_v1 *d,
+			    const union smcinvoke_arg *s, int n, int nbufs)
+{
+	int i;
+
+	for (i = 0; i < n; i++) {
+		memset(&d[i], 0, sizeof(d[i]));
+		if (i < nbufs) {
+			d[i].b = s[i].b;
+		} else {
+			d[i].o.fd = s[i].o.fd;
+			d[i].o.cb_server_fd = (s32)s[i].o.cb_server_fd;
+			d[i].o.reserved = (s32)s[i].o.reserved;
+		}
+	}
+}
+
+static int smci_cb_nbufs(const struct si_arg *u)
+{
+	int i, n = 0;
+
+	for (i = 0; u[i].type; i++)
+		if (u[i].type == SI_AT_IB || u[i].type == SI_AT_OB)
+			n++;
+	return n;
+}
+
+static int smci_cb_args_from_user(struct cb_txn *cb_txn, u64 uaddr)
+{
+	int n = cb_txn->u_args_sz / sizeof(union smcinvoke_arg);
+	union smcinvoke_arg_v1 *a;
+	int rc = 0;
+
+	a = kcalloc(n, sizeof(*a), GFP_KERNEL);
+	if (n && !a)
+		return -ENOMEM;
+	if (copy_from_user(a, u64_to_user_ptr(uaddr), n * sizeof(*a)))
+		rc = -EFAULT;
+	else
+		smci_args_from_v1(cb_txn->u_args, a, n,
+				  smci_cb_nbufs(cb_txn->args));
+	kfree(a);
+	return rc;
+}
+
+static int smci_cb_args_to_user(u64 uaddr, struct cb_txn *cb_txn)
+{
+	int n = cb_txn->u_args_sz / sizeof(union smcinvoke_arg);
+	union smcinvoke_arg_v1 *a;
+	int rc = 0;
+
+	a = kcalloc(n, sizeof(*a), GFP_KERNEL);
+	if (n && !a)
+		return -ENOMEM;
+	smci_args_to_v1(a, cb_txn->u_args, n, smci_cb_nbufs(cb_txn->args));
+	if (copy_to_user(u64_to_user_ptr(uaddr), a, n * sizeof(*a)))
+		rc = -EFAULT;
+	kfree(a);
+	return rc;
+}
+
 /* User Callback server */
 
-static long process_accept_req(struct server_info *si, struct smcinvoke_accept *accept)
+static long process_accept_req(struct server_info *si, struct smcinvoke_accept *accept,
+			       bool v1)
 {
 	struct cb_txn *cb_txn;
 
@@ -1216,7 +1352,8 @@ static long process_accept_req(struct server_info *si, struct smcinvoke_accept *
 			/* Only parse arguments on SUCCESS. */
 
 			/* Only copy arguments that we expect, i.e. 'u_args_sz'. */
-			if (copy_from_user(cb_txn->u_args,
+			if (v1 ? smci_cb_args_from_user(cb_txn, accept->buf_addr) :
+				copy_from_user(cb_txn->u_args,
 				(void __user *)accept->buf_addr, cb_txn->u_args_sz)) {
 
 				errno = -EFAULT;
@@ -1285,8 +1422,11 @@ wait_on_request:
 		accept->op = cb_txn->op;
 		accept->txn_id = cb_txn->context_id;
 
+		/* Buffer contents go right after the argument array. */
 		if (marshal_in_cb_req(cb_txn->u_args,
-			(void __user *)ALIGN(accept->buf_addr + cb_txn->u_args_sz, 8),
+			(void __user *)ALIGN(accept->buf_addr + (v1 ?
+				cb_txn->u_args_sz / sizeof(union smcinvoke_arg) *
+				sizeof(union smcinvoke_arg_v1) : cb_txn->u_args_sz), 8),
 				&accept->counts, cb_txn->args, si)) {
 
 			goto out_failed;
@@ -1295,7 +1435,8 @@ wait_on_request:
 		pr_debug("%s pick request with arguments (%04x) and op %d (context_id %llu)\n",
 			si->comm, accept->counts, accept->op, accept->txn_id);
 
-		if (copy_to_user((void __user *)accept->buf_addr,
+		if (v1 ? smci_cb_args_to_user(accept->buf_addr, cb_txn) :
+			copy_to_user((void __user *)accept->buf_addr,
 			cb_txn->u_args, cb_txn->u_args_sz)) {
 
 			/* TODO. We need to do some cleanup for 'marshal_in_cb_req'. */
@@ -1343,7 +1484,7 @@ static long server_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		if (copy_from_user(&accept, (void __user *)arg, sizeof(accept)))
 			return -EFAULT;
 
-		ret = process_accept_req(si, &accept);
+		ret = process_accept_req(si, &accept, false);
 		if (ret == -ERESTARTSYS) {
 			struct smcinvoke_accept __user *a = (struct smcinvoke_accept __user *)arg;
 
@@ -1373,6 +1514,45 @@ static long server_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 				return -EFAULT;
 			}
+		}
+
+		break;
+	}
+	case SMCINVOKE_IOCTL_ACCEPT_REQ_V1: {
+		struct smcinvoke_accept_v1 accept_v1;
+		struct smcinvoke_accept accept = { 0 };
+
+		if (copy_from_user(&accept_v1, (void __user *)arg, sizeof(accept_v1)))
+			return -EFAULT;
+
+		accept.has_resp = accept_v1.has_resp;
+		accept.result = accept_v1.result;
+		accept.op = accept_v1.op;
+		accept.counts = accept_v1.counts;
+		accept.reserved = accept_v1.reserved;
+		accept.argsize = accept_v1.argsize == sizeof(union smcinvoke_arg_v1) ?
+				 sizeof(union smcinvoke_arg) : 0;
+		accept.txn_id = accept_v1.txn_id;
+		accept.cbobj_id = accept_v1.cbobj_id;
+		accept.buf_len = accept_v1.buf_len;
+		accept.buf_addr = accept_v1.buf_addr;
+
+		ret = process_accept_req(si, &accept, true);
+		if (ret == -ERESTARTSYS) {
+			struct smcinvoke_accept_v1 __user *a = (void __user *)arg;
+
+			/* See SMCINVOKE_IOCTL_ACCEPT_REQ above. */
+			if (put_user(0, &a->has_resp))
+				return -EFAULT;
+		} else if (!ret) {
+			accept_v1.has_resp = 0;
+			accept_v1.txn_id = accept.txn_id;
+			accept_v1.result = accept.result;
+			accept_v1.cbobj_id = accept.cbobj_id;
+			accept_v1.op = accept.op;
+			accept_v1.counts = accept.counts;
+			if (copy_to_user((void __user *)arg, &accept_v1, sizeof(accept_v1)))
+				return -EFAULT;
 		}
 
 		break;
@@ -1445,6 +1625,9 @@ static long process_invoke_req(struct file *filp, unsigned int cmd, unsigned lon
 	struct si_object *object = filp->private_data;
 
 	struct smcinvoke_cmd_req u_req;	/* User request. */
+	struct smcinvoke_cmd_req_v1 u_req_v1;
+	bool v1 = cmd == SMCINVOKE_IOCTL_INVOKE_REQ_V1;
+	union smcinvoke_arg_v1 *u_args_v1 = NULL;
 	union smcinvoke_arg *u_args;	/* Array of arguments as passed from userspace. */
 	int u_args_nr;					/* Total number of arguments in 'u_args'. */
 
@@ -1454,11 +1637,24 @@ static long process_invoke_req(struct file *filp, unsigned int cmd, unsigned lon
 
 	/* Do some sanity check! */
 
-	if (_IOC_SIZE(cmd) != sizeof(u_req))
-		return -EINVAL;
+	if (v1) {
+		if (copy_from_user(&u_req_v1, (void __user *)arg, sizeof(u_req_v1)))
+			return -EFAULT;
 
-	if (copy_from_user(&u_req, (void __user *)arg, sizeof(u_req)))
-		return -EFAULT;
+		memset(&u_req, 0, sizeof(u_req));
+		u_req.op = u_req_v1.op;
+		u_req.counts = u_req_v1.counts;
+		u_req.result = u_req_v1.result;
+		u_req.argsize = u_req_v1.argsize == sizeof(union smcinvoke_arg_v1) ?
+				sizeof(union smcinvoke_arg) : 0;
+		u_req.args = u_req_v1.args;
+	} else {
+		if (_IOC_SIZE(cmd) != sizeof(u_req))
+			return -EINVAL;
+
+		if (copy_from_user(&u_req, (void __user *)arg, sizeof(u_req)))
+			return -EFAULT;
+	}
 
 	if (typeof_si_object(object) == SI_OT_ROOT) {
 		if ((u_req.op == IClientEnv_OP_notifyDomainChange) ||
@@ -1506,7 +1702,24 @@ static long process_invoke_req(struct file *filp, unsigned int cmd, unsigned lon
 	}
 
 	/* Copy argument array from userspace. */
-	if (copy_from_user(u_args, (void __user *)u_req.args, u_args_nr * u_req.argsize)) {
+	if (v1) {
+		u_args_v1 = kcalloc(u_args_nr, sizeof(*u_args_v1), GFP_KERNEL);
+		if (!u_args_v1) {
+			ret = -ENOMEM;
+
+			goto out_failed;
+		}
+
+		if (copy_from_user(u_args_v1, (void __user *)u_req.args,
+				   u_args_nr * sizeof(*u_args_v1))) {
+			ret = -EFAULT;
+
+			goto out_failed;
+		}
+
+		smci_args_from_v1(u_args, u_args_v1, u_args_nr,
+				  OBJECT_COUNTS_NUM_buffers(u_req.counts));
+	} else if (copy_from_user(u_args, (void __user *)u_req.args, u_args_nr * u_req.argsize)) {
 		ret = -EFAULT;
 
 		goto out_failed;
@@ -1582,7 +1795,16 @@ static long process_invoke_req(struct file *filp, unsigned int cmd, unsigned lon
 			goto out_failed;
 		}
 
-		if (copy_to_user((void __user *)u_req.args, u_args, u_args_nr * u_req.argsize)) {
+		if (v1) {
+			smci_args_to_v1(u_args_v1, u_args, u_args_nr,
+					OBJECT_COUNTS_NUM_buffers(u_req.counts));
+			if (copy_to_user((void __user *)u_req.args, u_args_v1,
+					 u_args_nr * sizeof(*u_args_v1))) {
+				ret = -EFAULT;
+
+				goto out_failed;
+			}
+		} else if (copy_to_user((void __user *)u_req.args, u_args, u_args_nr * u_req.argsize)) {
 			ret = -EFAULT;
 
 			goto out_failed;
@@ -1598,7 +1820,14 @@ static long process_invoke_req(struct file *filp, unsigned int cmd, unsigned lon
 	}
 
 	/* Copy u_req.result back! */
-	if (copy_to_user((void __user *)arg, &u_req, sizeof(u_req))) {
+	if (v1) {
+		u_req_v1.result = u_req.result;
+		if (copy_to_user((void __user *)arg, &u_req_v1, sizeof(u_req_v1))) {
+			ret = -EFAULT;
+
+			goto out_failed;
+		}
+	} else if (copy_to_user((void __user *)arg, &u_req, sizeof(u_req))) {
 		ret = -EFAULT;
 
 		goto out_failed;
@@ -1614,6 +1843,7 @@ out_failed:
 		u_req.counts, u_req.result, ret);
 	kfree(u);
 	kfree(u_args);
+	kfree(u_args_v1);
 	kfree(oic);
 
 	if (ret)
@@ -1628,6 +1858,7 @@ static long qtee_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 	switch (cmd) {
 	case SMCINVOKE_IOCTL_INVOKE_REQ:
+	case SMCINVOKE_IOCTL_INVOKE_REQ_V1:
 		ret = process_invoke_req(filp, cmd, arg);
 		break;
 	default:
@@ -1702,9 +1933,11 @@ static long root_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 	switch (cmd) {
 	case SMCINVOKE_IOCTL_INVOKE_REQ:
+	case SMCINVOKE_IOCTL_INVOKE_REQ_V1:
 		ret = process_invoke_req(filp, cmd, arg);
 		break;
 	case SMCINVOKE_IOCTL_SERVER_REQ:
+	case SMCINVOKE_IOCTL_SERVER_REQ_V1:
 		ret = process_server_req(filp, cmd, arg);
 		break;
 	default:
