@@ -19,20 +19,52 @@ The kernel calls itself **6.12.81-Suvkernel**.
 
 ## What works
 
-Display (120 Hz), touch, GPU, Wi-Fi, Bluetooth, SIMs and mobile data,
-speakers, microphones, video playback, charging and battery readings,
-vibration, camera, fingerprint, IR blaster and KernelSU (as a loadable
-module).
+Display (120 Hz), touch with double tap to wake, GPU, Wi-Fi, Bluetooth, SIMs
+and mobile data, speakers, earpiece, microphones, video playback, camera,
+fingerprint, IR blaster, vibration, deep sleep, charging with Xiaomi's
+battery authentication, and KernelSU (as a loadable module).
 
 Known gaps:
 
+- Fast PD charging (67 W) doesn't start yet: the charger firmware reports
+  no PD contract.
 - Widevine stays at L3 and `feature_enabler_client` keeps restarting. The
   6.12 `smcinvoke` driver changed its ioctl layout and the old vendor
   libraries don't understand it yet.
 - `memlat` (memory latency governor) doesn't load: the CPUCP firmware on
   redwood lacks the SCMI protocols it needs.
-- Wi-Fi runtime power management is turned off in the ROM. With it on, a
-  WCN6750 wake-up could reset the phone.
+
+## Works with any redwood ROM
+
+Every redwood ROM, AOSP or AOSPA, ships a device tree made for the 5.4
+kernel. This kernel meets those trees where they are, so a ROM only has to
+swap the kernel in (see "Using it in a ROM" below):
+
+- **Old sysfs paths.** SPMI devices keep their 5.4 names (`spmi0-02`), so
+  the torch and the PMIC ADC keep their paths, permissions and labels.
+- **Old tuning scripts.** A 5.4 `post_boot` writes `/proc/sys/kernel/sched_*`,
+  `/sys/devices/system/cpu/cpu_boost` and picks the `schedutil` governor.
+  Those paths exist again and lead to WALT, and `schedutil` is handed WALT's
+  governor. redwood's tuning is also WALT's default, so it holds even if the
+  script never runs.
+- **No stuck boost.** WALT's boot-time boost ends on its own a minute after
+  boot, and core control never pauses the big cores.
+- **Wi-Fi.** Runtime power management stays off whatever the ROM's
+  `WCNSS_qcom_cfg.ini` says; with it on, a WCN6750 wake-up could reset the
+  phone.
+- **Video.** The video driver labels its `sku_version` node itself, so the
+  media script picks redwood's media profiles before SELinux has caught up.
+- **No command line changes.** Unused clocks and power domains stay on by
+  default, which keeps the boot splash alive until the display takes over.
+
+## Charger
+
+redwood's charger firmware is Xiaomi's, so `qti_battery_charger` is Xiaomi's
+driver from the LineageOS sm8350 kernel, ported onto Qualcomm's 6.12 one. It
+speaks Xiaomi's property layout, has all of Xiaomi's `qcom-battery` nodes
+(battery and adapter authentication, fast charge mode, fuel gauge details),
+tells the firmware when the screen is off, and gives the `battery` thermal
+zone the fuel gauge's temperature.
 
 ## Where things are
 
@@ -83,11 +115,16 @@ ROM are in [redwood-6.12](https://github.com/suvojeet-sengupta/redwood-6.12).
 Don't build the kernel inside the ROM. The ready-made kernel, modules and
 `dtbo.img` are in
 [device_xiaomi_redwood-kernel-6.12](https://github.com/suvojeet-sengupta/device_xiaomi_redwood-kernel-6.12),
-and the device tree's `clo-6.12` branch uses them.
+whose README lists the few lines a device tree needs. The redwood device
+tree's `clo-6.12` branch already uses it.
+
+ROMs that build with Dolby set `debug.c2.use_dmabufheaps=1`; on this kernel
+that leaves the 32-bit video codecs without their ION buffers, so set it
+back to `0` in the device tree.
 
 ## Credits
 
-Qualcomm and CodeLinaro for the kernel platform, the LineageOS redwood/sm8350
-kernel for driver and device tree references.
+Qualcomm and CodeLinaro for the kernel platform, the LineageOS sm8350 kernel
+for the Xiaomi charger driver and for driver and device tree references.
 
 Ported and maintained by Suvojeet Sengupta.
