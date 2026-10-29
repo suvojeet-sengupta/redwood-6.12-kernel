@@ -176,3 +176,22 @@
 &socd_trip {
 	temperature = <101>;
 };
+
+/*
+ * The pm7325b BCL trips sit at 1 with a hysteresis of 1, and 6.12 clears a
+ * trip only once the reading drops below trip minus hysteresis, here 0. The
+ * BCL sensor reads 0 when its alarm is gone, so one voltage sag under load
+ * left all four big cores paused until reboot (the launcher at 90% on the
+ * little cores). Clear at 0, as pm8350c's BCL trips already do.
+ */
+&b_bcl_lvl0 {
+	hysteresis = <0>;
+};
+
+&b_bcl_lvl1 {
+	hysteresis = <0>;
+};
+
+&b_bcl_lvl2 {
+	hysteresis = <0>;
+};
