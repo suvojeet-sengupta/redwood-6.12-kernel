@@ -2464,20 +2464,44 @@ static struct ctl_table walt_table[] = {
 };
 
 /*
- * Perf HALs of the 5.4 era, like redwood's, set the boost through
- * /proc/sys/kernel/sched_boost, which WALT has moved to /proc/sys/walt.
+ * redwood: perf HALs and post_boot scripts of the 5.4 era, which every
+ * redwood ROM ships, tune WALT through /proc/sys/kernel, where 5.4 had
+ * these. Mirror them there; each entry shares its /proc/sys/walt twin's
+ * data and handler.
  */
-static struct ctl_table walt_compat_kernel_table[] = {
-	{
-		.procname	= "sched_boost",
-		.data		= &sysctl_sched_boost,
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= sched_boost_handler,
-		.extra1		= &neg_five,
-		.extra2		= &five,
-	},
+static const char * const walt_compat_kernel_names[] = {
+	"sched_boost",
+	"sched_upmigrate",
+	"sched_downmigrate",
+	"sched_group_upmigrate",
+	"sched_group_downmigrate",
+	"sched_walt_rotate_big_tasks",
+	"sched_coloc_busy_hysteresis_enable_cpus",
+	"sched_min_task_util_for_boost",
+	"sched_min_task_util_for_colocation",
+	"sched_task_unfilter_period",
+	"sched_conservative_pl",
 };
+static struct ctl_table walt_compat_kernel_table[ARRAY_SIZE(walt_compat_kernel_names)];
+
+static void walt_register_compat_sysctl(void)
+{
+	size_t i, j, n = 0;
+
+	for (i = 0; i < ARRAY_SIZE(walt_compat_kernel_names); i++) {
+		for (j = 0; j < ARRAY_SIZE(walt_table); j++) {
+			if (walt_table[j].procname &&
+			    !strcmp(walt_table[j].procname,
+				    walt_compat_kernel_names[i])) {
+				walt_compat_kernel_table[n++] = walt_table[j];
+				break;
+			}
+		}
+	}
+
+	if (!register_sysctl_sz("kernel", walt_compat_kernel_table, n))
+		pr_err("walt: no /proc/sys/kernel compat entries\n");
+}
 
 void walt_register_sysctl(void)
 {
@@ -2494,7 +2518,7 @@ void walt_register_sysctl(void)
 		*hdr21 = NULL;
 
 	hdr = register_sysctl("walt", walt_table);
-	register_sysctl("kernel", walt_compat_kernel_table);
+	walt_register_compat_sysctl();
 	hdr2 = register_sysctl("walt/input_boost", input_boost_sysctls);
 
 	if (num_sched_clusters >= 1) {
