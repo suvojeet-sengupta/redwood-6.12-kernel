@@ -63,13 +63,14 @@
 
 #if IS_ENABLED(CONFIG_QCOM_DMABUF_HEAPS_PAGE_POOL_REFILL)
 /*
- * Each pool is refilled up to 1/128 of RAM, at most 100 MB. A fixed 100 MB
- * suits 12 GB phones; on a 6 GB one the four refilled pools held about
- * 400 MB, and every refill after a video or camera allocation made kswapd
- * evict as much app memory.
+ * Each pool holds at most 1/256 of RAM, at most 100 MB: the refill stops
+ * there, and freed buffers beyond it go back to the page allocator. A fixed
+ * 100 MB suits 12 GB phones; on a 6 GB one the refilled pools held about
+ * 400 MB, freed video and GPU buffers grew them further, and kswapd evicted
+ * as much app memory to make up for it.
  */
 #define DYNAMIC_POOL_FILL_MARK_MAX (100 * SZ_1M)
-#define DYNAMIC_POOL_FILL_MARK_RAM_SHIFT 7
+#define DYNAMIC_POOL_FILL_MARK_RAM_SHIFT 8
 #define DYNAMIC_POOL_LOW_MARK_PERCENT 40UL
 
 static unsigned long dynamic_pool_fill_mark = DYNAMIC_POOL_FILL_MARK_MAX;
@@ -85,6 +86,11 @@ static int get_dynamic_pool_fillmark(struct dynamic_page_pool *pool)
 static bool dynamic_pool_fillmark_reached(struct dynamic_page_pool *pool)
 {
 	return atomic_read(&pool->count) >= get_dynamic_pool_fillmark(pool);
+}
+
+static bool dynamic_pool_full(struct dynamic_page_pool *pool)
+{
+	return dynamic_pool_fillmark_reached(pool);
 }
 
 static int get_dynamic_pool_lowmark(struct dynamic_page_pool *pool)
@@ -319,6 +325,11 @@ static bool dynamic_pool_needs_refill(struct dynamic_page_pool *pool)
 	return false;
 }
 
+static bool dynamic_pool_full(struct dynamic_page_pool *pool)
+{
+	return false;
+}
+
 static int system_heap_create_refill_worker(struct qcom_system_heap *sys_heap, const char *name)
 {
 	return 0;
@@ -395,7 +406,10 @@ static void system_heap_deferred_free(struct deferred_freelist_item *item,
 				if (compound_order(page) == orders[j])
 					break;
 			}
-			dynamic_page_pool_free(sys_heap->pool_list[j], page);
+			if (dynamic_pool_full(sys_heap->pool_list[j]))
+				__free_pages(page, compound_order(page));
+			else
+				dynamic_page_pool_free(sys_heap->pool_list[j], page);
 		}
 	}
 	sg_free_table(table);
