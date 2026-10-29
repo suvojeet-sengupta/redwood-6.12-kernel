@@ -158,3 +158,15 @@
 &pm7250b_vib {
 	status = "disabled";
 };
+
+/*
+ * The socd trip pauses all four big cores below 10% battery. redwood's
+ * worn batteries drop from the teens straight to 1% under load, so the
+ * phone crawled for as long as the gauge took to climb back past 10%,
+ * even on the charger. The PMIC BCL trips still pause them when the
+ * battery voltage really sags; keep socd for the thermal HAL's own trip
+ * only.
+ */
+&socd_trip {
+	temperature = <101>;
+};
