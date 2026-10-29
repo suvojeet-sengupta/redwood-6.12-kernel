@@ -21,7 +21,7 @@ use crate::{
     BinderReturnWriter, DArc, DLArc, DTRWrap, DeliverToRead,
 };
 
-use core::mem;
+use core::{fmt, mem};
 
 mod wrapper;
 pub(crate) use self::wrapper::CritIncrWrapper;
@@ -50,9 +50,9 @@ pub(crate) struct CouldNotDeliverCriticalIncrement;
 ///   about to drop the weak reference, then the strong increment could be processed after the
 ///   other thread has already exited, which would be too late.
 ///
-/// Note that trying to create a `ListArc` to the node can succeed even if `has_normal_push` is
+/// Note that trying to create a `ListArc` to the node can succeed even if `has_pushed_node` is
 /// set. This is because another thread might just have popped the node from a todo list, but not
-/// yet called `do_work`. However, if `has_normal_push` is false, then creating a `ListArc` should
+/// yet called `do_work`. However, if `has_pushed_node` is false, then creating a `ListArc` should
 /// always succeed.
 ///
 /// Like the other fields in `NodeInner`, the delivery state is protected by the process lock.
@@ -219,6 +219,34 @@ kernel::list::impl_list_item! {
     }
 }
 
+/// Formats the userspace `ptr` or `cookie` of a [`Node`] in full, or hashed like `%p` if the
+/// flag is set, as done for the `*_hashed` binder_logs files.
+struct MaybeHashed(u64, bool);
+
+impl fmt::Display for MaybeHashed {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self(value, hashed) = *self;
+        if hashed {
+            let mut buf = [0u8; 32];
+            let p = (value as usize) as *const kernel::ffi::c_void;
+            // SAFETY: `buf` is valid for writes of `buf.len()` bytes, `kernel::c_str!("%p")` is
+            // NUL-terminated, and `p` matches the `%p` format specifier.
+            let len = unsafe {
+                kernel::bindings::scnprintf(
+                    buf.as_mut_ptr().cast(),
+                    buf.len(),
+                    kernel::c_str!("%p").as_char_ptr(),
+                    p,
+                )
+            };
+            let s = core::str::from_utf8(&buf[..len as usize]).map_err(|_| fmt::Error)?;
+            f.write_str(s)
+        } else {
+            write!(f, "{value:016x}")
+        }
+    }
+}
+
 impl Node {
     pub(crate) fn new(
         ptr: u64,
@@ -265,15 +293,16 @@ impl Node {
         &self,
         m: &SeqFile,
         owner_inner: &mut ProcessInner,
-    ) -> Result<()> {
+        hashed: bool,
+    ) -> Result {
         let prio = self.node_prio();
         let inner = self.inner.access_mut(owner_inner);
         seq_print!(
             m,
-            "  node {}: u{:016x} c{:016x} pri {}:{} hs {} hw {} cs {} cw {}",
+            "  node {}: u{} c{} pri {}:{} hs {} hw {} cs {} cw {}",
             self.debug_id,
-            self.ptr,
-            self.cookie,
+            MaybeHashed(self.ptr, hashed),
+            MaybeHashed(self.cookie, hashed),
             prio.sched_policy,
             prio.prio,
             inner.strong.has_count,
@@ -370,7 +399,7 @@ impl Node {
     ) -> Option<DLArc<Node>> {
         let inner = self.inner.access_mut(owner_inner);
         if inner.active_inc_refs == 0 {
-            pr_err!("inc_ref_done called when no active inc_refs");
+            binder_debug!(UserError, "inc_ref_done called when no active inc_refs");
             return None;
         }
 
@@ -426,7 +455,7 @@ impl Node {
             !is_dead && !state.has_count
         } else {
             if state.count < count {
-                pr_err!("Failure: refcount underflow!");
+                pr_err_ratelimited!("Failure: refcount underflow!\n");
                 return None;
             }
             state.count -= count;
@@ -714,7 +743,7 @@ impl Node {
             .freeze_list
             .retain(|proc| !core::ptr::eq::<Process>(&**proc, p));
         if len == inner.freeze_list.len() {
-            pr_warn!(
+            pr_warn_ratelimited!(
                 "Could not remove freeze listener for {}\n",
                 p.pid_in_current_ns()
             );
@@ -759,7 +788,22 @@ impl DeliverToRead for Node {
         self.do_work_locked(writer, owner_inner)
     }
 
-    fn cancel(self: DArc<Self>) {}
+    fn cancel(self: DArc<Self>) {
+        let _drop_outside_lock;
+        let mut owner_inner = self.owner.inner.lock();
+
+        // We only do something on BINDER_THREAD_EXIT, not process exit.
+        if owner_inner.is_dead {
+            return;
+        }
+
+        // If BINDER_THREAD_EXIT is invoked on a thread with a pending node refcount update, we
+        // should move ourselves to ensure the refcount update is still delivered.
+        if let Some(node) = ListArc::try_from_arc_borrow(self.as_arc_borrow()) {
+            _drop_outside_lock = owner_inner.push_work(&self.owner, node);
+        }
+    }
+
     fn on_thread_selected(&self, _thread: &Thread) {}
 
     fn should_sync_wakeup(&self) -> bool {
@@ -767,14 +811,14 @@ impl DeliverToRead for Node {
     }
 
     #[inline(never)]
-    fn debug_print(&self, m: &SeqFile, prefix: &str, _tprefix: &str) -> Result<()> {
+    fn debug_print(&self, m: &SeqFile, prefix: &str, _tprefix: &str, hashed: bool) -> Result {
         seq_print!(
             m,
-            "{}node work {}: u{:016x} c{:016x}\n",
+            "{}node work {}: u{} c{}\n",
             prefix,
             self.debug_id,
-            self.ptr,
-            self.cookie,
+            MaybeHashed(self.ptr, hashed),
+            MaybeHashed(self.cookie, hashed),
         );
         Ok(())
     }
@@ -847,6 +891,7 @@ impl NodeRef {
 
     pub(crate) fn clone(&self, strong: bool) -> Result<NodeRef> {
         if strong && self.strong_count == 0 {
+            binder_debug!(UserError, "tried to use weak ref as strong ref");
             return Err(EINVAL);
         }
         Ok(self
@@ -887,9 +932,10 @@ impl NodeRef {
             *count += 1;
         } else {
             if *count == 0 {
-                pr_warn!(
-                    "pid {} performed invalid decrement on ref\n",
-                    kernel::current!().pid()
+                binder_debug!(
+                    UserError,
+                    "performed invalid {} decrement on ref",
+                    if strong { "strong" } else { "weak" }
                 );
                 return false;
             }
@@ -1137,6 +1183,11 @@ impl DeliverToRead for NodeDeath {
             // We're still holding the inner lock, so it cannot be aborted while we insert it into
             // the delivered list.
             process_inner.death_delivered(self.clone());
+            binder_debug!(
+                DeathNotification,
+                "sending death notification, cookie {:016x}",
+                cookie
+            );
             BR_DEAD_BINDER
         };
 
@@ -1147,7 +1198,14 @@ impl DeliverToRead for NodeDeath {
         Ok(cmd != BR_DEAD_BINDER)
     }
 
-    fn cancel(self: DArc<Self>) {}
+    fn cancel(self: DArc<Self>) {
+        binder_debug!(
+            pid = self.process.task.pid(),
+            DeadTransaction,
+            "undelivered death notification, {:016x}",
+            self.cookie
+        );
+    }
     fn on_thread_selected(&self, _thread: &Thread) {}
 
     fn should_sync_wakeup(&self) -> bool {
@@ -1155,7 +1213,7 @@ impl DeliverToRead for NodeDeath {
     }
 
     #[inline(never)]
-    fn debug_print(&self, m: &SeqFile, prefix: &str, _tprefix: &str) -> Result<()> {
+    fn debug_print(&self, m: &SeqFile, prefix: &str, _tprefix: &str, _hashed: bool) -> Result {
         let inner = self.inner.lock();
 
         let dead_binder = inner.dead && !inner.notification_done;

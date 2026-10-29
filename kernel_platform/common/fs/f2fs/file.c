@@ -1901,8 +1901,15 @@ static int f2fs_expand_inode_data(struct inode *inode, loff_t offset,
 
 	if (f2fs_is_pinned_file(inode)) {
 		block_t sec_blks = CAP_BLKS_PER_SEC(sbi);
-		block_t sec_len = roundup(map.m_len, sec_blks);
+		block_t sec_len;
 
+		if (map.m_lblk % sec_blks) {
+			map.m_lblk = rounddown(map.m_lblk, sec_blks);
+			map.m_len = pg_end - map.m_lblk;
+			if (off_end)
+				map.m_len++;
+		}
+		sec_len = roundup(map.m_len, sec_blks);
 		map.m_len = sec_blks;
 next_alloc:
 		f2fs_down_write(&sbi->pin_sem);
@@ -2147,6 +2154,13 @@ static int f2fs_setflags_common(struct inode *inode, u32 iflags, u32 mask)
 				f2fs_up_write(&fi->i_sem);
 				return -EINVAL;
 			}
+
+			trace_android_vh_f2fs_inode_may_compress(inode, &err);
+			if (err) {
+				f2fs_up_write(&fi->i_sem);
+				return err;
+			}
+
 			err = set_compress_context(inode);
 			f2fs_up_write(&fi->i_sem);
 
@@ -4733,10 +4747,17 @@ static long __f2fs_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 long f2fs_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
+	long ret = 0;
+	bool ioctl_done = false;
+
 	if (unlikely(f2fs_cp_error(F2FS_I_SB(file_inode(filp)))))
 		return -EIO;
 	if (!f2fs_is_checkpoint_ready(F2FS_I_SB(file_inode(filp))))
 		return -ENOSPC;
+
+	trace_android_vh_f2fs_customized_ioctl(filp, cmd, arg, &ret, &ioctl_done);
+	if (ioctl_done)
+		return ret;
 
 	return __f2fs_ioctl(filp, cmd, arg);
 }
@@ -5034,12 +5055,18 @@ static ssize_t f2fs_buffered_write_iter(struct kiocb *iocb,
 	struct file *file = iocb->ki_filp;
 	struct inode *inode = file_inode(file);
 	ssize_t ret;
+	bool write_done = false;
 
 	if (iocb->ki_flags & IOCB_NOWAIT)
 		return -EOPNOTSUPP;
 
+	trace_android_rvh_f2fs_buffer_write(iocb, from, &ret, &write_done);
+	if (write_done)
+		goto out;
+
 	ret = generic_perform_write(iocb, from);
 
+out:
 	if (ret > 0) {
 		f2fs_update_iostat(F2FS_I_SB(inode), inode,
 						APP_BUFFERED_IO, ret);

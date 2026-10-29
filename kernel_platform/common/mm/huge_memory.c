@@ -2691,7 +2691,9 @@ static void __split_huge_pmd_locked(struct vm_area_struct *vma, pmd_t *pmd,
 			if (!folio_test_referenced(folio) && pmd_young(old_pmd))
 				folio_set_referenced(folio);
 			folio_remove_rmap_pmd(folio, page, vma);
+			add_mm_counter(mm, mm_counter_file(folio), -HPAGE_PMD_NR);
 			folio_put(folio);
+			return;
 		}
 		add_mm_counter(mm, mm_counter_file(folio), -HPAGE_PMD_NR);
 		return;
@@ -3505,6 +3507,11 @@ int split_huge_page_to_list_to_order(struct page *page, struct list_head *list,
 	}
 
 	trace_android_vh_mm_split_huge_page_bypass(page, list, &ret, &bypass);
+	if (bypass)
+		goto out_unlock;
+
+	trace_android_rvh_mm_folio_split_bypass(folio, new_order, list,
+						&xas, end, &ret, &bypass);
 	if (bypass)
 		goto out_unlock;
 
