@@ -55,6 +55,9 @@
 #define BC_CHG_CTRL_LIMIT_EN		0x48
 #define BC_HBOOST_VMAX_CLAMP_NOTIFY	0x79
 #define BC_GENERIC_NOTIFY		0x80
+/* Xiaomi's charger firmware: battery and adapter authentication */
+#define BC_XM_STATUS_GET		0x50
+#define BC_XM_STATUS_SET		0x51
 
 /* Generic definitions */
 #define CHEMISTRY_MAX_STR_LEN		4
@@ -84,6 +87,7 @@ enum psy_type {
 	PSY_TYPE_USB,
 	PSY_TYPE_USB_2,
 	PSY_TYPE_WLS,
+	PSY_TYPE_XM,
 	PSY_TYPE_MAX,
 };
 
@@ -284,6 +288,68 @@ struct battery_charger_chg_ctrl_msg {
 	u32			delta_soc;
 };
 
+/*
+ * Xiaomi's XM status properties, as redwood's charger firmware numbers
+ * them: the order of xm_property_id in Xiaomi's 5.4 driver built with
+ * redwood's options (BQ_FG_1S, BQ2597X, BQ_CLOUD_AUTHENTICATION,
+ * REDWOOD_FOR_BUILD). Only the ones the authentication daemon
+ * (batterysecret) uses are named. Until it has verified the battery, the
+ * firmware holds the charge current at 2 A.
+ */
+enum xm_property_id {
+	XM_PROP_VERIFY_DIGEST			= 1,
+	XM_PROP_AUTHENTIC			= 3,
+	XM_PROP_CHIP_OK				= 4,
+	XM_PROP_REAL_TYPE			= 46,
+	XM_PROP_VERIFY_PROCESS			= 47,
+	XM_PROP_VDM_CMD_CHARGER_VERSION		= 48,
+	XM_PROP_VDM_CMD_CHARGER_VOLTAGE		= 49,
+	XM_PROP_VDM_CMD_CHARGER_TEMP		= 50,
+	XM_PROP_VDM_CMD_SESSION_SEED		= 51,
+	XM_PROP_VDM_CMD_AUTHENTICATION		= 52,
+	XM_PROP_VDM_CMD_VERIFIED		= 53,
+	XM_PROP_VDM_CMD_REMOVE_COMPENSATION	= 54,
+	XM_PROP_VDM_CMD_REVERSE_AUTHEN		= 55,
+	XM_PROP_CURRENT_STATE			= 56,
+	XM_PROP_ADAPTER_ID			= 57,
+	XM_PROP_ADAPTER_SVID			= 58,
+	XM_PROP_PD_VERIFED			= 59,
+	XM_PROP_PDO2				= 60,
+	XM_PROP_UVDM_STATE			= 61,
+	XM_PROP_MAX				= 114,
+};
+
+#define XM_DIGEST_LEN			32
+#define XM_SS_AUTH_LEN			4
+
+/* What the adapter authentication asks of the charger firmware */
+enum xm_uvdm_state {
+	XM_UVDM_DISCONNECT,
+	XM_UVDM_CHARGER_VERSION,
+	XM_UVDM_CHARGER_VOLTAGE,
+	XM_UVDM_CHARGER_TEMP,
+	XM_UVDM_SESSION_SEED,
+	XM_UVDM_AUTHENTICATION,
+	XM_UVDM_VERIFIED,
+	XM_UVDM_REMOVE_COMPENSATION,
+	XM_UVDM_REVERSE_AUTHEN,
+	XM_UVDM_CONNECT,
+};
+
+/* Both go out and come back whole, unlike the u32 properties */
+struct xm_verify_digest_msg {
+	struct pmic_glink_hdr	hdr;
+	u32			property_id;
+	u8			digest[XM_DIGEST_LEN];
+	bool			slave_fg;
+};
+
+struct xm_ss_auth_msg {
+	struct pmic_glink_hdr	hdr;
+	u32			property_id;
+	u32			data[XM_SS_AUTH_LEN];
+};
+
 struct psy_state {
 	struct power_supply	*psy;
 	char			*model;
@@ -358,6 +424,9 @@ struct battery_chg_dev {
 	struct bharger_regulator	nfc_vreg;
 #endif
 	u32				num_usb_ports;
+	u8				xm_digest[XM_DIGEST_LEN];
+	u32				xm_ss_auth[XM_SS_AUTH_LEN];
+	bool				xm_slave_fg;
 };
 
 static const int battery_prop_map[BATT_PROP_MAX] = {
@@ -847,6 +916,36 @@ static void handle_message(struct battery_chg_dev *bcdev, void *data,
 			pst->prop[resp_msg->property_id] = resp_msg->value;
 			ack_set = true;
 		}
+
+		break;
+	case BC_XM_STATUS_GET:
+		pst = &bcdev->psy_list[PSY_TYPE_XM];
+		if (len == sizeof(struct xm_verify_digest_msg)) {
+			memcpy(bcdev->xm_digest,
+			       ((struct xm_verify_digest_msg *)data)->digest,
+			       XM_DIGEST_LEN);
+			ack_set = true;
+			break;
+		}
+		if (len == sizeof(struct xm_ss_auth_msg)) {
+			memcpy(bcdev->xm_ss_auth,
+			       ((struct xm_ss_auth_msg *)data)->data,
+			       sizeof(bcdev->xm_ss_auth));
+			ack_set = true;
+			break;
+		}
+		if (validate_message(bcdev, resp_msg, len) &&
+		    resp_msg->property_id < pst->prop_count) {
+			pst->prop[resp_msg->property_id] = resp_msg->value;
+			ack_set = true;
+		}
+
+		break;
+	case BC_XM_STATUS_SET:
+		if (len == sizeof(struct xm_verify_digest_msg) ||
+		    len == sizeof(struct xm_ss_auth_msg) ||
+		    validate_message(bcdev, data, len))
+			ack_set = true;
 
 		break;
 	case BC_USB_STATUS_SET(USB_2_PORT_ID):
@@ -2596,6 +2695,417 @@ static ssize_t battery_chg_notify_store(const struct class *c,
 static CLASS_ATTR_WO(battery_chg_notify);
 
 /* Battery classes with wireless */
+/*
+ * The qcom-battery nodes Xiaomi's batterysecret daemon talks to, as
+ * Xiaomi's 5.4 driver had them: it reads a challenge's digest from the
+ * battery's fuel gauge, checks it and reports back through authentic, and
+ * runs the PD adapter authentication through request_vdm_cmd. They are
+ * only added when the charger firmware is Xiaomi's.
+ */
+static int xm_write_blob(struct battery_chg_dev *bcdev, u32 prop_id,
+			 const void *payload, size_t size, bool digest)
+{
+	struct psy_state *pst = &bcdev->psy_list[PSY_TYPE_XM];
+
+	if (digest) {
+		struct xm_verify_digest_msg msg = { { 0 } };
+
+		msg.hdr.owner = MSG_OWNER_BC;
+		msg.hdr.type = MSG_TYPE_REQ_RESP;
+		msg.hdr.opcode = pst->opcode_set;
+		msg.property_id = prop_id;
+		msg.slave_fg = bcdev->xm_slave_fg;
+		memcpy(msg.digest, payload, min(size, sizeof(msg.digest)));
+		return battery_chg_write(bcdev, &msg, sizeof(msg),
+					 BC_WAIT_TIME_MS);
+	} else {
+		struct xm_ss_auth_msg msg = { { 0 } };
+
+		msg.hdr.owner = MSG_OWNER_BC;
+		msg.hdr.type = MSG_TYPE_REQ_RESP;
+		msg.hdr.opcode = pst->opcode_set;
+		msg.property_id = prop_id;
+		memcpy(msg.data, payload, min(size, sizeof(msg.data)));
+		return battery_chg_write(bcdev, &msg, sizeof(msg),
+					 BC_WAIT_TIME_MS);
+	}
+}
+
+static int xm_read_blob(struct battery_chg_dev *bcdev, u32 prop_id,
+			bool digest)
+{
+	struct psy_state *pst = &bcdev->psy_list[PSY_TYPE_XM];
+
+	if (digest) {
+		struct xm_verify_digest_msg msg = { { 0 } };
+
+		msg.hdr.owner = MSG_OWNER_BC;
+		msg.hdr.type = MSG_TYPE_REQ_RESP;
+		msg.hdr.opcode = pst->opcode_get;
+		msg.property_id = prop_id;
+		msg.slave_fg = bcdev->xm_slave_fg;
+		return battery_chg_write(bcdev, &msg, sizeof(msg),
+					 BC_WAIT_TIME_MS);
+	} else {
+		struct xm_ss_auth_msg msg = { { 0 } };
+
+		msg.hdr.owner = MSG_OWNER_BC;
+		msg.hdr.type = MSG_TYPE_REQ_RESP;
+		msg.hdr.opcode = pst->opcode_get;
+		msg.property_id = prop_id;
+		return battery_chg_write(bcdev, &msg, sizeof(msg),
+					 BC_WAIT_TIME_MS);
+	}
+}
+
+/*
+ * Hex text to bytes the way Xiaomi's driver read it: pairs of digits, a
+ * last odd digit on its own, stopping at the first non-hex character.
+ */
+static size_t xm_hex_to_bytes(const char *str, size_t slen, u8 *out,
+			      size_t out_len)
+{
+	size_t n = 0, i = 0;
+	int hi, lo;
+
+	while (n < out_len && i < slen) {
+		hi = hex_to_bin(str[i]);
+		if (hi < 0)
+			break;
+		if (i + 1 >= slen || (lo = hex_to_bin(str[i + 1])) < 0) {
+			out[n++] = hi;
+			break;
+		}
+		out[n++] = (hi << 4) | lo;
+		i += 2;
+	}
+
+	return n;
+}
+
+static ssize_t xm_prop_show(const struct class *c, char *buf, u32 prop_id,
+			    const char *fmt)
+{
+	struct battery_chg_dev *bcdev = container_of(c, struct battery_chg_dev,
+						battery_class);
+	struct psy_state *pst = &bcdev->psy_list[PSY_TYPE_XM];
+	int rc;
+
+	rc = read_property_id(bcdev, pst, prop_id);
+	if (rc < 0)
+		return rc;
+
+	return scnprintf(buf, PAGE_SIZE, fmt, pst->prop[prop_id]);
+}
+
+static ssize_t xm_prop_store_bool(const struct class *c, const char *buf,
+				  size_t count, u32 prop_id)
+{
+	struct battery_chg_dev *bcdev = container_of(c, struct battery_chg_dev,
+						battery_class);
+	bool val;
+	int rc;
+
+	if (kstrtobool(buf, &val))
+		return -EINVAL;
+
+	rc = write_property_id(bcdev, &bcdev->psy_list[PSY_TYPE_XM], prop_id,
+			       val);
+	return rc < 0 ? rc : count;
+}
+
+#define XM_RO(name, prop_id, fmt)					\
+	static ssize_t name##_show(const struct class *c,		\
+				   const struct class_attribute *attr,	\
+				   char *buf)				\
+	{								\
+		return xm_prop_show(c, buf, prop_id, fmt);		\
+	}								\
+	static CLASS_ATTR_RO(name)
+
+#define XM_RW_BOOL(name, prop_id)					\
+	static ssize_t name##_show(const struct class *c,		\
+				   const struct class_attribute *attr,	\
+				   char *buf)				\
+	{								\
+		return xm_prop_show(c, buf, prop_id, "%u\n");		\
+	}								\
+	static ssize_t name##_store(const struct class *c,		\
+				    const struct class_attribute *attr,	\
+				    const char *buf, size_t count)	\
+	{								\
+		return xm_prop_store_bool(c, buf, count, prop_id);	\
+	}								\
+	static CLASS_ATTR_RW(name)
+
+XM_RW_BOOL(authentic, XM_PROP_AUTHENTIC);
+XM_RO(chip_ok, XM_PROP_CHIP_OK, "%u\n");
+XM_RW_BOOL(verify_process, XM_PROP_VERIFY_PROCESS);
+XM_RW_BOOL(pd_verifed, XM_PROP_PD_VERIFED);
+XM_RO(adapter_id, XM_PROP_ADAPTER_ID, "%08x");
+XM_RO(adapter_svid, XM_PROP_ADAPTER_SVID, "%04x");
+XM_RO(pdo2, XM_PROP_PDO2, "%08x\n");
+
+static const char * const xm_real_type_text[] = {
+	"Unknown", "USB", "USB_DCP", "USB_CDP", "USB_ACA", "USB_C",
+	"USB_PD", "PD_DRP", "PD_PPS", "BrickID", "USB_HVDCP",
+	"USB_HVDCP3", "USB_HVDCP3P5", "USB_FLOAT",
+};
+
+static ssize_t real_type_show(const struct class *c,
+			      const struct class_attribute *attr, char *buf)
+{
+	struct battery_chg_dev *bcdev = container_of(c, struct battery_chg_dev,
+						battery_class);
+	struct psy_state *pst = &bcdev->psy_list[PSY_TYPE_XM];
+	u32 type;
+	int rc;
+
+	rc = read_property_id(bcdev, pst, XM_PROP_REAL_TYPE);
+	if (rc < 0)
+		return rc;
+
+	type = pst->prop[XM_PROP_REAL_TYPE];
+	if (type >= ARRAY_SIZE(xm_real_type_text))
+		type = 0;
+
+	return scnprintf(buf, PAGE_SIZE, "%s\n", xm_real_type_text[type]);
+}
+static CLASS_ATTR_RO(real_type);
+
+static ssize_t current_state_show(const struct class *c,
+				  const struct class_attribute *attr,
+				  char *buf)
+{
+	struct battery_chg_dev *bcdev = container_of(c, struct battery_chg_dev,
+						battery_class);
+	struct psy_state *pst = &bcdev->psy_list[PSY_TYPE_XM];
+	const char *state;
+	int rc;
+
+	rc = read_property_id(bcdev, pst, XM_PROP_CURRENT_STATE);
+	if (rc < 0)
+		return rc;
+
+	switch (pst->prop[XM_PROP_CURRENT_STATE]) {
+	case 25:
+		state = "SNK_Startup";
+		break;
+	case 31:
+		state = "SNK_Ready";
+		break;
+	case 5:
+		state = "SRC_Ready";
+		break;
+	default:
+		state = "UNKNOWN";
+		break;
+	}
+
+	return scnprintf(buf, PAGE_SIZE, "%s", state);
+}
+static CLASS_ATTR_RO(current_state);
+
+static ssize_t verify_slave_flag_show(const struct class *c,
+				      const struct class_attribute *attr,
+				      char *buf)
+{
+	struct battery_chg_dev *bcdev = container_of(c, struct battery_chg_dev,
+						battery_class);
+
+	return scnprintf(buf, PAGE_SIZE, "%u\n", bcdev->xm_slave_fg);
+}
+
+static ssize_t verify_slave_flag_store(const struct class *c,
+				       const struct class_attribute *attr,
+				       const char *buf, size_t count)
+{
+	struct battery_chg_dev *bcdev = container_of(c, struct battery_chg_dev,
+						battery_class);
+
+	if (kstrtobool(buf, &bcdev->xm_slave_fg))
+		return -EINVAL;
+
+	return count;
+}
+static CLASS_ATTR_RW(verify_slave_flag);
+
+/* The challenge goes in as hex, the fuel gauge's digest comes out as hex */
+static ssize_t verify_digest_store(const struct class *c,
+				   const struct class_attribute *attr,
+				   const char *buf, size_t count)
+{
+	struct battery_chg_dev *bcdev = container_of(c, struct battery_chg_dev,
+						battery_class);
+	u8 random[XM_DIGEST_LEN] = { 0 };
+	int rc;
+
+	xm_hex_to_bytes(buf, strcspn(buf, "\n"), random, sizeof(random));
+	rc = xm_write_blob(bcdev, XM_PROP_VERIFY_DIGEST, random,
+			   sizeof(random), true);
+	return rc < 0 ? rc : count;
+}
+
+static ssize_t verify_digest_show(const struct class *c,
+				  const struct class_attribute *attr,
+				  char *buf)
+{
+	struct battery_chg_dev *bcdev = container_of(c, struct battery_chg_dev,
+						battery_class);
+	int rc, i, len = 0;
+
+	rc = xm_read_blob(bcdev, XM_PROP_VERIFY_DIGEST, true);
+	if (rc < 0)
+		return rc;
+
+	for (i = 0; i < XM_DIGEST_LEN; i++)
+		len += scnprintf(buf + len, PAGE_SIZE - len, "%02x",
+				 bcdev->xm_digest[i]);
+
+	/* Xiaomi's driver counted the terminating NUL; batterysecret expects it */
+	return len + 1;
+}
+static CLASS_ATTR_RW(verify_digest);
+
+static ssize_t request_vdm_cmd_store(const struct class *c,
+				     const struct class_attribute *attr,
+				     const char *buf, size_t count)
+{
+	struct battery_chg_dev *bcdev = container_of(c, struct battery_chg_dev,
+						battery_class);
+	struct psy_state *pst = &bcdev->psy_list[PSY_TYPE_XM];
+	u32 data[8] = { 0 };
+	const char *hex;
+	u32 prop_id;
+	int cmd, rc, i;
+
+	if (sscanf(buf, "%d,", &cmd) != 1)
+		return -EINVAL;
+	hex = strchr(buf, ',');
+	hex = hex ? hex + 1 : "";
+	xm_hex_to_bytes(hex, strcspn(hex, "\n"), (u8 *)data, sizeof(data));
+
+	switch (cmd) {
+	case XM_UVDM_CHARGER_VERSION:
+		prop_id = XM_PROP_VDM_CMD_CHARGER_VERSION;
+		break;
+	case XM_UVDM_CHARGER_VOLTAGE:
+		prop_id = XM_PROP_VDM_CMD_CHARGER_VOLTAGE;
+		break;
+	case XM_UVDM_CHARGER_TEMP:
+		prop_id = XM_PROP_VDM_CMD_CHARGER_TEMP;
+		break;
+	case XM_UVDM_SESSION_SEED:
+		prop_id = XM_PROP_VDM_CMD_SESSION_SEED;
+		break;
+	case XM_UVDM_AUTHENTICATION:
+		prop_id = XM_PROP_VDM_CMD_AUTHENTICATION;
+		break;
+	case XM_UVDM_REVERSE_AUTHEN:
+		prop_id = XM_PROP_VDM_CMD_REVERSE_AUTHEN;
+		break;
+	case XM_UVDM_REMOVE_COMPENSATION:
+		prop_id = XM_PROP_VDM_CMD_REMOVE_COMPENSATION;
+		break;
+	case XM_UVDM_VERIFIED:
+		prop_id = XM_PROP_VDM_CMD_VERIFIED;
+		break;
+	default:
+		prop_id = XM_PROP_VDM_CMD_CHARGER_VERSION;
+		break;
+	}
+
+	if (cmd == XM_UVDM_SESSION_SEED || cmd == XM_UVDM_AUTHENTICATION ||
+	    cmd == XM_UVDM_REVERSE_AUTHEN) {
+		/* The hash words go out in the adapter's byte order */
+		for (i = 0; i < XM_SS_AUTH_LEN; i++)
+			data[i] = swab32(data[i]);
+		rc = xm_write_blob(bcdev, prop_id, data,
+				   XM_SS_AUTH_LEN * sizeof(u32), false);
+	} else if (cmd == XM_UVDM_REMOVE_COMPENSATION ||
+		   cmd == XM_UVDM_VERIFIED) {
+		rc = write_property_id(bcdev, pst, prop_id, data[0]);
+	} else {
+		rc = write_property_id(bcdev, pst, prop_id, 0);
+	}
+
+	return rc < 0 ? rc : count;
+}
+
+static ssize_t request_vdm_cmd_show(const struct class *c,
+				    const struct class_attribute *attr,
+				    char *buf)
+{
+	struct battery_chg_dev *bcdev = container_of(c, struct battery_chg_dev,
+						battery_class);
+	struct psy_state *pst = &bcdev->psy_list[PSY_TYPE_XM];
+	u32 prop_id, cmd;
+	int rc, i, len;
+
+	rc = read_property_id(bcdev, pst, XM_PROP_UVDM_STATE);
+	if (rc < 0)
+		return rc;
+	cmd = pst->prop[XM_PROP_UVDM_STATE];
+
+	switch (cmd) {
+	case XM_UVDM_CHARGER_VERSION:
+	case XM_UVDM_CHARGER_VOLTAGE:
+	case XM_UVDM_CHARGER_TEMP:
+		prop_id = cmd == XM_UVDM_CHARGER_VERSION ?
+				XM_PROP_VDM_CMD_CHARGER_VERSION :
+			  cmd == XM_UVDM_CHARGER_VOLTAGE ?
+				XM_PROP_VDM_CMD_CHARGER_VOLTAGE :
+				XM_PROP_VDM_CMD_CHARGER_TEMP;
+		rc = read_property_id(bcdev, pst, prop_id);
+		if (rc < 0)
+			return rc;
+		return scnprintf(buf, PAGE_SIZE, "%u,%u", cmd,
+				 pst->prop[prop_id]);
+	case XM_UVDM_AUTHENTICATION:
+		rc = xm_read_blob(bcdev, XM_PROP_VDM_CMD_AUTHENTICATION, false);
+		if (rc < 0)
+			return rc;
+		len = scnprintf(buf, PAGE_SIZE, "%u,", cmd);
+		for (i = 0; i < XM_SS_AUTH_LEN; i++)
+			len += scnprintf(buf + len, PAGE_SIZE - len, "%08x",
+					 bcdev->xm_ss_auth[i]);
+		return len;
+	default:
+		return scnprintf(buf, PAGE_SIZE, "%u,Null", cmd);
+	}
+}
+static CLASS_ATTR_RW(request_vdm_cmd);
+
+static const struct class_attribute *xm_class_attrs[] = {
+	&class_attr_authentic,
+	&class_attr_chip_ok,
+	&class_attr_real_type,
+	&class_attr_verify_digest,
+	&class_attr_verify_slave_flag,
+	&class_attr_verify_process,
+	&class_attr_request_vdm_cmd,
+	&class_attr_current_state,
+	&class_attr_adapter_id,
+	&class_attr_adapter_svid,
+	&class_attr_pd_verifed,
+	&class_attr_pdo2,
+};
+
+static void xm_add_class_attrs(struct battery_chg_dev *bcdev)
+{
+	int i, rc;
+
+	if (!bcdev->xiaomi_batt_props)
+		return;
+
+	for (i = 0; i < ARRAY_SIZE(xm_class_attrs); i++) {
+		rc = class_create_file(&bcdev->battery_class, xm_class_attrs[i]);
+		if (rc)
+			pr_err("Couldn't add %s rc=%d\n",
+			       xm_class_attrs[i]->attr.name, rc);
+	}
+}
+
 static struct attribute *battery_class_attrs[] = {
 	&class_attr_soh.attr,
 	&class_attr_resistance.attr,
@@ -3088,6 +3598,9 @@ static int battery_chg_probe(struct platform_device *pdev)
 	bcdev->psy_list[PSY_TYPE_WLS].prop_count = WLS_PROP_MAX;
 	bcdev->psy_list[PSY_TYPE_WLS].opcode_get = BC_WLS_STATUS_GET;
 	bcdev->psy_list[PSY_TYPE_WLS].opcode_set = BC_WLS_STATUS_SET;
+	bcdev->psy_list[PSY_TYPE_XM].prop_count = XM_PROP_MAX;
+	bcdev->psy_list[PSY_TYPE_XM].opcode_get = BC_XM_STATUS_GET;
+	bcdev->psy_list[PSY_TYPE_XM].opcode_set = BC_XM_STATUS_SET;
 	bcdev->usb_active[USB_1_PORT_ID] = true;
 
 	rc = of_property_read_u32(dev->of_node, "qcom,multiport-usb", &bcdev->num_usb_ports);
@@ -3216,6 +3729,8 @@ static int battery_chg_probe(struct platform_device *pdev)
 		dev_err(dev, "Failed to create battery_class rc=%d\n", rc);
 		goto error;
 	}
+
+	xm_add_class_attrs(bcdev);
 
 	pst = &bcdev->psy_list[PSY_TYPE_BATTERY];
 	tcd = devm_thermal_of_cooling_device_register(dev, dev->of_node,
