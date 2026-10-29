@@ -62,16 +62,24 @@
 #include "mm/internal.h"
 
 #if IS_ENABLED(CONFIG_QCOM_DMABUF_HEAPS_PAGE_POOL_REFILL)
-#define DYNAMIC_POOL_FILL_MARK (100 * SZ_1M)
+/*
+ * Each pool is refilled up to 1/128 of RAM, at most 100 MB. A fixed 100 MB
+ * suits 12 GB phones; on a 6 GB one the four refilled pools held about
+ * 400 MB, and every refill after a video or camera allocation made kswapd
+ * evict as much app memory.
+ */
+#define DYNAMIC_POOL_FILL_MARK_MAX (100 * SZ_1M)
+#define DYNAMIC_POOL_FILL_MARK_RAM_SHIFT 7
 #define DYNAMIC_POOL_LOW_MARK_PERCENT 40UL
-#define DYNAMIC_POOL_LOW_MARK ((DYNAMIC_POOL_FILL_MARK * DYNAMIC_POOL_LOW_MARK_PERCENT) / 100)
+
+static unsigned long dynamic_pool_fill_mark = DYNAMIC_POOL_FILL_MARK_MAX;
 
 #define DYNAMIC_POOL_REFILL_DEFER_WINDOW_MS 10
 #define DYNAMIC_POOL_KTHREAD_NICE_VAL 10
 
 static int get_dynamic_pool_fillmark(struct dynamic_page_pool *pool)
 {
-	return DYNAMIC_POOL_FILL_MARK / (PAGE_SIZE << pool->order);
+	return dynamic_pool_fill_mark / (PAGE_SIZE << pool->order);
 }
 
 static bool dynamic_pool_fillmark_reached(struct dynamic_page_pool *pool)
@@ -81,7 +89,8 @@ static bool dynamic_pool_fillmark_reached(struct dynamic_page_pool *pool)
 
 static int get_dynamic_pool_lowmark(struct dynamic_page_pool *pool)
 {
-	return DYNAMIC_POOL_LOW_MARK / (PAGE_SIZE << pool->order);
+	return dynamic_pool_fill_mark * DYNAMIC_POOL_LOW_MARK_PERCENT / 100 /
+		(PAGE_SIZE << pool->order);
 }
 
 static bool dynamic_pool_count_below_lowmark(struct dynamic_page_pool *pool)
@@ -273,6 +282,10 @@ static int system_heap_create_refill_worker(struct qcom_system_heap *sys_heap, c
 	struct sched_attr attr = { .sched_nice = DYNAMIC_POOL_KTHREAD_NICE_VAL };
 	int ret;
 	int i;
+
+	dynamic_pool_fill_mark = min_t(unsigned long, DYNAMIC_POOL_FILL_MARK_MAX,
+				       (totalram_pages() << PAGE_SHIFT) >>
+				       DYNAMIC_POOL_FILL_MARK_RAM_SHIFT);
 
 	refill_worker = kthread_run(system_heap_refill_worker, sys_heap->pool_list,
 				    "%s-pool-refill-thread", name);
