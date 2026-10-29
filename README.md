@@ -21,9 +21,8 @@ The kernel calls itself **6.12.81-Suvkernel**.
 
 Display (120 Hz), touch, GPU, Wi-Fi, Bluetooth, SIMs and mobile data,
 speakers, microphones, video playback, charging and battery readings,
-vibration and KernelSU (as a loadable module).
-
-Ported but not fully tested yet: camera, fingerprint, IR blaster.
+vibration, camera, fingerprint, IR blaster and KernelSU (as a loadable
+module).
 
 Known gaps:
 
