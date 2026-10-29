@@ -1716,6 +1716,28 @@ memlat_unlock:
 #endif
 #define INST_EV		0x08
 #define CYC_EV		0x11
+
+/*
+ * Whether any memlat group asks for the CPUCP firmware to run it. Groups
+ * that don't sample in HLOS and need no SCMI, so they can probe without it.
+ */
+static bool memlat_needs_cpucp(struct device_node *np)
+{
+	struct device_node *child;
+
+	if (of_property_read_bool(np, "qcom,cpucp-enabled"))
+		return true;
+
+	for_each_available_child_of_node(np, child) {
+		if (memlat_needs_cpucp(child)) {
+			of_node_put(child);
+			return true;
+		}
+	}
+
+	return false;
+}
+
 static int memlat_dev_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -1730,9 +1752,13 @@ static int memlat_dev_probe(struct platform_device *pdev)
 	scmi_dev = get_qcom_scmi_device();
 	if (IS_ERR(scmi_dev)) {
 		ret = PTR_ERR(scmi_dev);
-		if (ret == -EPROBE_DEFER)
+		/*
+		 * Firmware without the SCMI vendor protocol (redwood's CPUCP)
+		 * never brings the device up; HLOS sampling doesn't need it.
+		 */
+		if (ret == -EPROBE_DEFER && memlat_needs_cpucp(dev->of_node))
 			return ret;
-		dev_err(dev, "Error getting scmi_dev ret = %d\n", ret);
+		dev_info(dev, "No SCMI device (%d), sampling in HLOS\n", ret);
 	}
 #endif
 

@@ -1164,9 +1164,15 @@ static int qcom_pmu_driver_probe(struct platform_device *pdev)
 	scmi_dev = get_qcom_scmi_device();
 	if (IS_ERR(scmi_dev)) {
 		ret = PTR_ERR(scmi_dev);
-		if (ret == -EPROBE_DEFER)
+		/*
+		 * SCMI only serves the counters shared with CPUCP (pmu-base).
+		 * Firmware without the SCMI vendor protocol (redwood's CPUCP)
+		 * never brings it up; HLOS users like memlat don't need it.
+		 */
+		if (ret == -EPROBE_DEFER &&
+		    of_property_match_string(dev->of_node, "reg-names", "pmu-base") >= 0)
 			return ret;
-		dev_err(dev, "Error getting scmi_dev ret = %d\n", ret);
+		dev_info(dev, "No SCMI device (%d), PMU events for HLOS only\n", ret);
 	}
 #endif
 	ret = cpu_logical_to_phys(0);
