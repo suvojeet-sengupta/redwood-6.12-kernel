@@ -260,7 +260,99 @@ static struct input_handler inputboost_input_handler = {
 	.id_table	= inputboost_ids,
 };
 
+/*
+ * redwood: the 5.4 /sys/devices/system/cpu/cpu_boost nodes, which the
+ * 5.4-era post_boot scripts of redwood ROMs write. They set the same
+ * tunables as /proc/sys/walt/input_boost.
+ */
+static ssize_t input_boost_freq_show(struct kobject *kobj,
+				     struct kobj_attribute *attr, char *buf)
+{
+	ssize_t n = 0;
+	int cpu;
+
+	for_each_possible_cpu(cpu)
+		n += scnprintf(buf + n, PAGE_SIZE - n, "%d:%u ", cpu,
+			       sysctl_input_boost_freq[cpu]);
+	if (n)
+		buf[n - 1] = '\n';
+	return n;
+}
+
+/* "freq" for every CPU, or "cpu:freq" pairs separated by spaces */
+static ssize_t input_boost_freq_store(struct kobject *kobj,
+				      struct kobj_attribute *attr,
+				      const char *buf, size_t count)
+{
+	unsigned int cpu, val;
+	const char *cp = buf;
+
+	if (!strchr(buf, ':')) {
+		if (kstrtouint(buf, 0, &val))
+			return -EINVAL;
+		for_each_possible_cpu(cpu)
+			sysctl_input_boost_freq[cpu] = val;
+		return count;
+	}
+
+	while (cp && *cp && *cp != '\n') {
+		if (sscanf(cp, "%u:%u", &cpu, &val) != 2 ||
+		    cpu >= nr_cpu_ids || cpu >= WALT_NR_CPUS)
+			return -EINVAL;
+		sysctl_input_boost_freq[cpu] = val;
+		cp = strchr(cp, ' ');
+		if (cp)
+			cp = skip_spaces(cp);
+	}
+	return count;
+}
+
+static ssize_t input_boost_ms_show(struct kobject *kobj,
+				   struct kobj_attribute *attr, char *buf)
+{
+	return scnprintf(buf, PAGE_SIZE, "%u\n", sysctl_input_boost_ms);
+}
+
+static ssize_t input_boost_ms_store(struct kobject *kobj,
+				    struct kobj_attribute *attr,
+				    const char *buf, size_t count)
+{
+	unsigned int val;
+
+	if (kstrtouint(buf, 0, &val))
+		return -EINVAL;
+	sysctl_input_boost_ms = val;
+	return count;
+}
+
+static struct kobj_attribute input_boost_freq_attr = __ATTR_RW(input_boost_freq);
+static struct kobj_attribute input_boost_ms_attr = __ATTR_RW(input_boost_ms);
+
+static struct attribute *cpu_boost_attrs[] = {
+	&input_boost_freq_attr.attr,
+	&input_boost_ms_attr.attr,
+	NULL,
+};
+
+static const struct attribute_group cpu_boost_group = {
+	.attrs = cpu_boost_attrs,
+};
+
 struct kobject *input_boost_kobj;
+
+static void cpu_boost_compat_init(void)
+{
+	struct device *dev_root = bus_get_dev_root(&cpu_subsys);
+
+	if (!dev_root)
+		return;
+	input_boost_kobj = kobject_create_and_add("cpu_boost", &dev_root->kobj);
+	put_device(dev_root);
+	if (!input_boost_kobj ||
+	    sysfs_create_group(input_boost_kobj, &cpu_boost_group))
+		pr_err("no cpu_boost nodes\n");
+}
+
 int input_boost_init(void)
 {
 	int cpu, ret;
@@ -296,5 +388,6 @@ int input_boost_init(void)
 	}
 
 	ret = input_register_handler(&inputboost_input_handler);
+	cpu_boost_compat_init();
 	return 0;
 }
