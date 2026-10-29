@@ -1752,6 +1752,39 @@ static int _sde_cp_cache_range_property(struct drm_crtc *crtc,
 	return ret;
 }
 
+/*
+ * The IGC and GC LUT structs gained _extended tables at their end. A display
+ * HAL built against the older uapi (redwood's 5.4 vendor) sends them without
+ * those, and the panel's gamma calibration was rejected. Pad such a blob with
+ * zeros: the extended tables are only read with the high precision flags,
+ * which that HAL never sets.
+ */
+static struct drm_property_blob *_sde_cp_pad_legacy_lut(struct drm_crtc *crtc,
+		struct drm_property_blob *blob, u32 exp_sz)
+{
+	struct drm_property_blob *full;
+	size_t legacy_sz;
+
+	if (exp_sz == sizeof(struct drm_msm_igc_lut))
+		legacy_sz = exp_sz - 3 * IGC_TBL_LEN_EXTENDED * sizeof(__u32);
+	else if (exp_sz == sizeof(struct drm_msm_pgc_lut))
+		legacy_sz = exp_sz - 3 * PGC_TBL_LEN_EXTENDED * sizeof(__u32);
+	else
+		return blob;
+
+	if (blob->length != legacy_sz)
+		return blob;
+
+	full = drm_property_create_blob(crtc->dev, exp_sz, NULL);
+	if (IS_ERR(full))
+		return blob;
+
+	memcpy(full->data, blob->data, legacy_sz);
+	drm_property_blob_put(blob);
+
+	return full;
+}
+
 static int _sde_cp_crtc_cache_blob_property(struct drm_crtc *crtc,
 					       struct sde_cp_node *prop_node,
 					       uint64_t val)
@@ -1776,6 +1809,7 @@ static int _sde_cp_crtc_cache_blob_property(struct drm_crtc *crtc,
 		DRM_ERROR("invalid blob id %lld feature %d\n", val, prop_node->feature);
 		return -EINVAL;
 	}
+	blob = _sde_cp_pad_legacy_lut(crtc, blob, prop_node->prop_blob_sz);
 	if (blob->length != prop_node->prop_blob_sz) {
 		DRM_ERROR("invalid blob len %zd exp %d feature %d\n",
 		    blob->length, prop_node->prop_blob_sz, prop_node->feature);
