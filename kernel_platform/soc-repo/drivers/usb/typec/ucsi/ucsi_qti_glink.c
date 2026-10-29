@@ -12,6 +12,7 @@
 #include <linux/module.h>
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
+#include <linux/power_supply.h>
 #include <linux/slab.h>
 #include <linux/soc/qcom/qti_pmic_glink.h>
 
@@ -93,6 +94,9 @@ struct ucsi_dev {
 	struct work_struct		unregister_work;
 	atomic_t			state;
 	bool				remoteproc_timestamp_en;
+	struct notifier_block		psy_nb;
+	struct delayed_work		legacy_work;
+	struct typec_partner		*legacy_partner;
 };
 
 struct remoteproc_ts {
@@ -238,6 +242,95 @@ static int handle_ucsi_write_ack(struct ucsi_dev *udev, void *data, size_t len)
 	return 0;
 }
 
+/*
+ * A legacy USB-A to USB-C cable: the PMIC sees the attach, but the ADSP
+ * reports no connection over UCSI and never sends a connector change, so
+ * no partner exists and Android shows the port as disconnected (USB
+ * preferences greyed out, no MTP). When the charger has found a data port
+ * (SDP or CDP) and UCSI has no partner, register one; UCSI's own takes
+ * over at the next connector change. Called with state_lock held.
+ */
+static void ucsi_qti_drop_legacy_partner(struct ucsi_dev *udev)
+{
+	if (!udev->legacy_partner)
+		return;
+
+	typec_unregister_partner(udev->legacy_partner);
+	udev->legacy_partner = NULL;
+}
+
+static bool ucsi_qti_usb_data_port(void)
+{
+	union power_supply_propval online = {0}, type = {0};
+	struct power_supply *psy;
+
+	psy = power_supply_get_by_name("usb");
+	if (!psy)
+		return false;
+
+	power_supply_get_property(psy, POWER_SUPPLY_PROP_ONLINE, &online);
+	power_supply_get_property(psy, POWER_SUPPLY_PROP_USB_TYPE, &type);
+	power_supply_put(psy);
+
+	return online.intval && (type.intval == POWER_SUPPLY_USB_TYPE_SDP ||
+				 type.intval == POWER_SUPPLY_USB_TYPE_CDP);
+}
+
+static void ucsi_qti_legacy_work(struct work_struct *work)
+{
+	struct ucsi_dev *udev = container_of(to_delayed_work(work),
+					     struct ucsi_dev, legacy_work);
+	bool data_port = ucsi_qti_usb_data_port();
+	struct typec_partner_desc desc = {
+		.accessory = TYPEC_ACCESSORY_NONE,
+	};
+	struct ucsi_connector *con;
+	struct typec_partner *partner;
+
+	mutex_lock(&udev->state_lock);
+	if (!udev->ucsi || !udev->ucsi->connector ||
+	    !udev->ucsi->connector[0].port) {
+		/* UCSI registers its ports asynchronously; try again. */
+		if (data_port && atomic_read(&udev->state) == PMIC_GLINK_STATE_UP)
+			schedule_delayed_work(&udev->legacy_work, HZ);
+		goto out;
+	}
+
+	con = &udev->ucsi->connector[0];
+	mutex_lock(&con->lock);
+	if (data_port && !con->partner && !udev->legacy_partner) {
+		partner = typec_register_partner(con->port, &desc);
+		if (IS_ERR(partner)) {
+			dev_err(udev->dev, "Failed to register legacy partner: %ld\n",
+				PTR_ERR(partner));
+		} else {
+			udev->legacy_partner = partner;
+			typec_set_pwr_opmode(con->port, TYPEC_PWR_MODE_USB);
+			typec_set_pwr_role(con->port, TYPEC_SINK);
+			typec_set_data_role(con->port, TYPEC_DEVICE);
+			dev_info(udev->dev, "legacy cable: registered USB partner\n");
+		}
+	} else if ((!data_port || con->partner) && udev->legacy_partner) {
+		ucsi_qti_drop_legacy_partner(udev);
+		dev_info(udev->dev, "legacy cable: partner removed\n");
+	}
+	mutex_unlock(&con->lock);
+out:
+	mutex_unlock(&udev->state_lock);
+}
+
+static int ucsi_qti_psy_notifier(struct notifier_block *nb, unsigned long evt,
+				 void *data)
+{
+	struct ucsi_dev *udev = container_of(nb, struct ucsi_dev, psy_nb);
+	struct power_supply *psy = data;
+
+	if (evt == PSY_EVENT_PROP_CHANGED && !strcmp(psy->desc->name, "usb"))
+		mod_delayed_work(system_wq, &udev->legacy_work, 0);
+
+	return NOTIFY_OK;
+}
+
 static int handle_ucsi_notify(struct ucsi_dev *udev, void *data, size_t len)
 {
 	struct ucsi_notify_ind_msg *msg_ptr;
@@ -281,8 +374,15 @@ static int handle_ucsi_notify(struct ucsi_dev *udev, void *data, size_t len)
 	if (con_num && con_num <= udev->ucsi->cap.num_connectors &&
 		udev->ucsi->connector) {
 		con = &udev->ucsi->connector[con_num - 1];
-		if (con && con->ucsi)
+		if (con && con->ucsi) {
+			/* A real connector change: UCSI owns the partner now. */
+			if (udev->legacy_partner) {
+				mutex_lock(&con->lock);
+				ucsi_qti_drop_legacy_partner(udev);
+				mutex_unlock(&con->lock);
+			}
 			ucsi_connector_change(udev->ucsi, con_num);
+		}
 	}
 	mutex_unlock(&udev->state_lock);
 
@@ -537,6 +637,7 @@ static int ucsi_setup(struct ucsi_dev *udev)
 	}
 
 	mutex_unlock(&udev->state_lock);
+	schedule_delayed_work(&udev->legacy_work, HZ);
 	return 0;
 }
 
@@ -559,6 +660,7 @@ static void ucsi_qti_unregister_work(struct work_struct *work)
 	}
 
 	mutex_lock(&udev->state_lock);
+	ucsi_qti_drop_legacy_partner(udev);
 	ucsi_unregister(udev->ucsi);
 	ucsi_destroy(udev->ucsi);
 	udev->ucsi = NULL;
@@ -603,6 +705,7 @@ static int ucsi_probe(struct platform_device *pdev)
 
 	INIT_WORK(&udev->setup_work, ucsi_qti_setup_work);
 	INIT_WORK(&udev->unregister_work, ucsi_qti_unregister_work);
+	INIT_DELAYED_WORK(&udev->legacy_work, ucsi_qti_legacy_work);
 	mutex_init(&udev->read_lock);
 	mutex_init(&udev->write_lock);
 	mutex_init(&udev->state_lock);
@@ -667,9 +770,14 @@ static int ucsi_probe(struct platform_device *pdev)
 		ipc_log_context_destroy(ucsi_ipc_log);
 		ucsi_ipc_log = NULL;
 		pmic_glink_unregister_client(udev->client);
+		return rc;
 	}
 
-	return rc;
+	udev->psy_nb.notifier_call = ucsi_qti_psy_notifier;
+	if (power_supply_reg_notifier(&udev->psy_nb))
+		dev_warn(dev, "No power supply notifier: legacy cables stay unseen\n");
+
+	return 0;
 }
 
 static void ucsi_remove(struct platform_device *pdev)
@@ -679,8 +787,11 @@ static void ucsi_remove(struct platform_device *pdev)
 	int rc;
 
 	debugfs_remove_recursive(udev->debugfs_dir);
+	power_supply_unreg_notifier(&udev->psy_nb);
+	cancel_delayed_work_sync(&udev->legacy_work);
 	cancel_work_sync(&udev->setup_work);
 	if (!cancel_work_sync(&udev->unregister_work)) {
+		ucsi_qti_drop_legacy_partner(udev);
 		ucsi_unregister(udev->ucsi);
 		ucsi_destroy(udev->ucsi);
 	}
