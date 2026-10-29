@@ -542,10 +542,16 @@ enum hdd_runtime_pm_cfg {
  *
  * </ini>
  */
+/*
+ * redwood: runtime PM stays off whatever the ini says. On 6.12 a runtime
+ * resume of the WCN6750 could hard reset the phone (PS_HOLD, no log) a few
+ * minutes after boot, and the ROMs ship gRuntimePM=2; with the range
+ * capped at 0, CFG_VALUE_OR_DEFAULT falls back to the default of 0.
+ */
 #define CFG_ENABLE_RUNTIME_PM CFG_INI_UINT( \
 		"gRuntimePM", \
 		0, \
-		2, \
+		0, \
 		0, \
 		CFG_VALUE_OR_DEFAULT, \
 		"This ini is used to enable runtime_suspend")
