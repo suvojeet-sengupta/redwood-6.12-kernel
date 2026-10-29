@@ -28,8 +28,6 @@ Known gaps:
 
 - Fast PD charging (67 W) doesn't start yet: the charger firmware reports
   no PD contract.
-- `memlat` (memory latency governor) doesn't load: the CPUCP firmware on
-  redwood lacks the SCMI protocols it needs.
 
 ## Works with any redwood ROM
 
@@ -54,6 +52,10 @@ swap the kernel in (see "Using it in a ROM" below):
 - **TrustZone.** `smcinvoke` also speaks the 5.4 ioctl layout the old
   vendor libraries use, and the real `qseecom` driver serves QTEE's listener
   requests, so Widevine runs at L1 and the feature enabler loads.
+- **Memory buses.** `memlat` samples in the kernel instead of waiting for
+  SCMI, which redwood's CPUCP firmware lacks, and the DDR, LLCC and L3
+  boot boost ends a minute after boot even though the 5.4 `post_boot`
+  doesn't know those nodes.
 - **No command line changes.** Unused clocks and power domains stay on by
   default, which keeps the boot splash alive until the display takes over.
 
