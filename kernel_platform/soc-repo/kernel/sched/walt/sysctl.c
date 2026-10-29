@@ -2463,6 +2463,22 @@ static struct ctl_table walt_table[] = {
 	},
 };
 
+/*
+ * Perf HALs of the 5.4 era, like redwood's, set the boost through
+ * /proc/sys/kernel/sched_boost, which WALT has moved to /proc/sys/walt.
+ */
+static struct ctl_table walt_compat_kernel_table[] = {
+	{
+		.procname	= "sched_boost",
+		.data		= &sysctl_sched_boost,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= sched_boost_handler,
+		.extra1		= &neg_five,
+		.extra2		= &five,
+	},
+};
+
 void walt_register_sysctl(void)
 {
 	struct ctl_table_header *hdr, *hdr2,
@@ -2478,6 +2494,7 @@ void walt_register_sysctl(void)
 		*hdr21 = NULL;
 
 	hdr = register_sysctl("walt", walt_table);
+	register_sysctl("kernel", walt_compat_kernel_table);
 	hdr2 = register_sysctl("walt/input_boost", input_boost_sysctls);
 
 	if (num_sched_clusters >= 1) {

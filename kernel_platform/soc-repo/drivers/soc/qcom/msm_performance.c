@@ -59,6 +59,7 @@ enum cpu_clusters {
 
 static struct kset *msm_perf_kset;
 static struct kobject *param_kobj;
+static struct kobject *compat_param_kobj;
 
 static ssize_t get_cpu_min_freq(struct kobject *kobj,
 	struct kobj_attribute *attr, char *buf);
@@ -147,6 +148,20 @@ static int add_module_params(void)
 		pr_err("msm_perf: Failed to create sysfs\n");
 		return ret;
 	}
+
+#ifdef MODULE
+	/*
+	 * Perf HALs of the 5.4 era, like redwood's, still look for the CPU
+	 * frequency limits under /sys/module/msm_performance/parameters, as
+	 * module parameters; without them every touch and launch boost
+	 * failed. Offer the same files there.
+	 */
+	compat_param_kobj = kobject_create_and_add("parameters",
+						   &THIS_MODULE->mkobj.kobj);
+	if (!compat_param_kobj ||
+	    sysfs_create_group(compat_param_kobj, &param_attr_group))
+		pr_err("msm_perf: Failed to add the module parameters\n");
+#endif
 	return 0;
 }
 
