@@ -27,8 +27,6 @@
 
 #define __reverse_ffz(x) __reverse_ffs(~(x))
 
-struct android_sec_entry *android_sec_entries;
-
 static struct kmem_cache *discard_entry_slab;
 static struct kmem_cache *discard_cmd_slab;
 static struct kmem_cache *sit_entry_set_slab;
@@ -1294,7 +1292,7 @@ static int __submit_discard_cmd(struct f2fs_sb_info *sbi,
 	if (dc->state != D_PREP)
 		return 0;
 
-	if (is_sbi_flag_set(sbi, SBI_NEED_FSCK))
+	if (is_sbi_flag_set(sbi, SBI_NEED_FSCK) || f2fs_is_suspending(sbi))
 		return 0;
 
 #ifdef CONFIG_BLK_DEV_ZONED
@@ -1624,7 +1622,7 @@ static void __issue_discard_cmd_orderly(struct f2fs_sb_info *sbi,
 		if (dc->state != D_PREP)
 			goto next;
 
-		if (*issued > 0 && unlikely(freezing(current)))
+		if (f2fs_is_suspending(sbi))
 			break;
 
 		if (dpolicy->io_aware && !is_idle(sbi, DISCARD_TIME)) {
@@ -1697,7 +1695,7 @@ retry:
 		list_for_each_entry_safe(dc, tmp, pend_list, list) {
 			f2fs_bug_on(sbi, dc->state != D_PREP);
 
-			if (issued > 0 && unlikely(freezing(current))) {
+			if (f2fs_is_suspending(sbi)) {
 				suspended = true;
 				break;
 			}
@@ -1908,7 +1906,7 @@ void f2fs_stop_discard_thread(struct f2fs_sb_info *sbi)
  *
  * Return true if issued all discard cmd or no discard cmd need issue, otherwise return false.
  */
-bool f2fs_issue_discard_timeout(struct f2fs_sb_info *sbi)
+bool f2fs_issue_discard_timeout(struct f2fs_sb_info *sbi, bool need_check)
 {
 	struct discard_cmd_control *dcc = SM_I(sbi)->dcc_info;
 	struct discard_policy dpolicy;
@@ -1925,7 +1923,7 @@ bool f2fs_issue_discard_timeout(struct f2fs_sb_info *sbi)
 	/* just to make sure there is no pending discard commands */
 	__wait_all_discard_cmd(sbi, NULL);
 
-	f2fs_bug_on(sbi, atomic_read(&dcc->discard_cmd_cnt));
+	f2fs_bug_on(sbi, need_check && atomic_read(&dcc->discard_cmd_cnt));
 	return !dropped;
 }
 
@@ -1964,7 +1962,8 @@ static int issue_discard_thread(void *data)
 			continue;
 		if (kthread_should_stop())
 			return 0;
-		if (is_sbi_flag_set(sbi, SBI_NEED_FSCK) ||
+		if (f2fs_is_suspending(sbi) ||
+			is_sbi_flag_set(sbi, SBI_NEED_FSCK) ||
 			!atomic_read(&dcc->discard_cmd_cnt)) {
 			wait_ms = dpolicy.max_interval;
 			continue;
@@ -2395,7 +2394,7 @@ static void destroy_discard_cmd_control(struct f2fs_sb_info *sbi)
 	 * Recovery can cache discard commands, so in error path of
 	 * fill_super(), it needs to give a chance to handle them.
 	 */
-	f2fs_issue_discard_timeout(sbi);
+	f2fs_issue_discard_timeout(sbi, true);
 
 	kfree(dcc);
 	SM_I(sbi)->dcc_info = NULL;
@@ -2509,8 +2508,7 @@ static int update_sit_entry_for_release(struct f2fs_sb_info *sbi, struct seg_ent
 		if (!f2fs_test_bit(offset + i, se->ckpt_valid_map)) {
 			se->ckpt_valid_blocks -= 1;
 			if (__is_large_section(sbi))
-				android_get_sec_entry(sbi, segno)->
-						ckpt_valid_blocks -= 1;
+				get_sec_entry(sbi, segno)->ckpt_valid_blocks -= 1;
 		}
 	}
 
@@ -2557,16 +2555,14 @@ static int update_sit_entry_for_alloc(struct f2fs_sb_info *sbi, struct seg_entry
 		if (!f2fs_test_and_set_bit(offset, se->ckpt_valid_map)) {
 			se->ckpt_valid_blocks++;
 			if (__is_large_section(sbi))
-				android_get_sec_entry(sbi, segno)->
-						ckpt_valid_blocks++;
+				get_sec_entry(sbi, segno)->ckpt_valid_blocks++;
 		}
 	}
 
 	if (!f2fs_test_bit(offset, se->ckpt_valid_map)) {
 		se->ckpt_valid_blocks += del;
 		if (__is_large_section(sbi))
-			android_get_sec_entry(sbi, segno)->
-						ckpt_valid_blocks += del;
+			get_sec_entry(sbi, segno)->ckpt_valid_blocks += del;
 	}
 
 	if (__is_large_section(sbi))
@@ -2790,6 +2786,7 @@ static int get_new_segment(struct f2fs_sb_info *sbi,
 	unsigned int total_zones = MAIN_SECS(sbi) / sbi->secs_per_zone;
 	unsigned int hint = GET_SEC_FROM_SEG(sbi, *newseg);
 	unsigned int old_zoneno = GET_ZONE_FROM_SEG(sbi, *newseg);
+	unsigned int max_secno = MAIN_SECS(sbi);
 	bool init = true;
 	int i;
 	int ret = 0;
@@ -2815,39 +2812,45 @@ static int get_new_segment(struct f2fs_sb_info *sbi,
 	 */
 	if (f2fs_sb_has_blkzoned(sbi)) {
 		/* Prioritize writing to conventional zones */
-		if (sbi->blkzone_alloc_policy == BLKZONE_ALLOC_PRIOR_CONV || pinning)
+		if (sbi->blkzone_alloc_policy == BLKZONE_ALLOC_PRIOR_CONV)
 			segno = 0;
 		else
-			segno = max(sbi->first_zoned_segno, *newseg);
+			segno = max(sbi->first_seq_zone_segno, *newseg);
 		hint = GET_SEC_FROM_SEG(sbi, segno);
 	}
 #endif
 
+	if (pinning) {
+		max_secno = sbi->pinned_area_max_secno;
+		hint = 0;
+	}
+
 find_other_zone:
-	secno = find_next_zero_bit(free_i->free_secmap, MAIN_SECS(sbi), hint);
+	secno = find_next_zero_bit(free_i->free_secmap, max_secno, hint);
 
 #ifdef CONFIG_BLK_DEV_ZONED
-	if (secno >= MAIN_SECS(sbi) && f2fs_sb_has_blkzoned(sbi)) {
+	if (secno >= max_secno && f2fs_sb_has_blkzoned(sbi)) {
 		/* Write only to sequential zones */
 		if (sbi->blkzone_alloc_policy == BLKZONE_ALLOC_ONLY_SEQ) {
-			hint = GET_SEC_FROM_SEG(sbi, sbi->first_zoned_segno);
-			secno = find_next_zero_bit(free_i->free_secmap, MAIN_SECS(sbi), hint);
+			hint = GET_SEC_FROM_SEG(sbi, sbi->first_seq_zone_segno);
+			secno = find_next_zero_bit(free_i->free_secmap, max_secno, hint);
 		} else
 			secno = find_first_zero_bit(free_i->free_secmap,
-								MAIN_SECS(sbi));
-		if (secno >= MAIN_SECS(sbi)) {
-			ret = -ENOSPC;
-			f2fs_bug_on(sbi, 1);
+								max_secno);
+		if (secno >= max_secno) {
+			ret = (pinning && has_unpinned_area(sbi)) ?
+					-EAGAIN : -ENOSPC;
+			f2fs_bug_on(sbi, !pinning);
 			goto out_unlock;
 		}
 	}
 #endif
 
-	if (secno >= MAIN_SECS(sbi)) {
-		secno = find_first_zero_bit(free_i->free_secmap,
-							MAIN_SECS(sbi));
-		if (secno >= MAIN_SECS(sbi)) {
-			ret = -ENOSPC;
+	if (secno >= max_secno) {
+		secno = find_first_zero_bit(free_i->free_secmap, max_secno);
+		if (secno >= max_secno) {
+			ret = (pinning && has_unpinned_area(sbi)) ?
+					-EAGAIN : -ENOSPC;
 			f2fs_bug_on(sbi, !pinning);
 			goto out_unlock;
 		}
@@ -2883,12 +2886,6 @@ got_it:
 		goto out_unlock;
 	}
 
-	/* no free section in conventional device or conventional zone */
-	if (new_sec && pinning &&
-		f2fs_is_sequential_zone_area(sbi, START_BLOCK(sbi, segno))) {
-		ret = -EAGAIN;
-		goto out_unlock;
-	}
 	__set_inuse(sbi, segno);
 	*newseg = segno;
 out_unlock:
@@ -3355,15 +3352,17 @@ retry:
 	err = f2fs_allocate_new_section(sbi, CURSEG_COLD_DATA_PINNED, false);
 	f2fs_unlock_op(sbi, &lc);
 
-	if (f2fs_sb_has_blkzoned(sbi) && err == -EAGAIN && gc_required) {
-		f2fs_down_write_trace(&sbi->gc_lock, &lc);
-		err = f2fs_gc_range(sbi, 0, sbi->first_zoned_segno - 1,
-				true, ZONED_PIN_SEC_REQUIRED_COUNT);
-		f2fs_up_write_trace(&sbi->gc_lock, &lc);
-
-		gc_required = false;
-		if (!err)
+	if (has_unpinned_area(sbi) && err == -EAGAIN && gc_required) {
+		err = f2fs_gc_range(sbi, 0,
+				sbi->pinned_area_max_secno * SEGS_PER_SEC(sbi) - 1,
+				true, ZONED_PIN_SEC_REQUIRED_COUNT, true);
+		if (err)
+			return err;
+		err = f2fs_sync_fs(sbi->sb, 1);
+		if (!err) {
+			gc_required = false;
 			goto retry;
+		}
 	}
 
 	return err;
@@ -4853,14 +4852,6 @@ static int build_sit_info(struct f2fs_sb_info *sbi)
 				      GFP_KERNEL);
 		if (!sit_i->sec_entries)
 			return -ENOMEM;
-
-		f2fs_bug_on(sbi, android_sec_entries);
-		android_sec_entries =
-			f2fs_kvzalloc(sbi, array_size(sizeof(struct android_sec_entry),
-						      MAIN_SECS(sbi)),
-				      GFP_KERNEL);
-		if (!android_sec_entries)
-			return -ENOMEM;
 	}
 
 	/* get information related with SIT */
@@ -5835,10 +5826,6 @@ static void destroy_sit_info(struct f2fs_sb_info *sbi)
 	kfree(sit_i->tmp_map);
 
 	kvfree(sit_i->sentries);
-	if (__is_large_section(sbi)) {
-		kvfree(android_sec_entries);
-		android_sec_entries = NULL;
-	}
 	kvfree(sit_i->sec_entries);
 	kvfree(sit_i->dirty_sentries_bitmap);
 
