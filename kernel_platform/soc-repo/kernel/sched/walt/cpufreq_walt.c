@@ -1439,6 +1439,14 @@ static int waltgov_init(struct cpufreq_policy *policy)
 	if (ret)
 		goto fail;
 
+	/*
+	 * redwood: post_boot scripts written for 5.4 tune policyN/schedutil/,
+	 * and the cpufreq core hands them this governor for "schedutil".
+	 */
+	if (sysfs_create_link(get_governor_parent_kobj(policy),
+			      &tunables->attr_set.kobj, "schedutil"))
+		pr_warn("no schedutil link for policy%u\n", policy->cpu);
+
 	return 0;
 
 fail:
@@ -1462,6 +1470,7 @@ static void waltgov_exit(struct cpufreq_policy *policy)
 	struct waltgov_tunables *tunables = wg_policy->tunables;
 	unsigned int count;
 
+	sysfs_remove_link(get_governor_parent_kobj(policy), "schedutil");
 	count = gov_attr_set_put(&tunables->attr_set, &wg_policy->tunables_hook);
 	policy->governor_data = NULL;
 	if (!count) {
