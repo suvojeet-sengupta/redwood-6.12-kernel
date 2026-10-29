@@ -5311,15 +5311,13 @@ static int msm_geni_serial_reconfigure_baud_rate(struct uart_port *uport)
 
 	UART_LOG_DBG(port->ipc_log_misc, uport->dev, "%s: start %d\n", __func__, true);
 
-	if (!uart_console(uport)) {
-		ret = msm_geni_serial_power_on(uport);
-		if (ret) {
-			UART_LOG_DBG(port->ipc_log_misc, uport->dev,
-				     "%s: Failed to vote clock on:%d\n", __func__, ret);
-			return -EINVAL;
-		}
-	}
-
+	/*
+	 * Only runtime resume calls this, with the resources already on: a
+	 * power_on() here waited on the very runtime resume it runs in. After
+	 * redwood's first deep sleep the Bluetooth HAL's clock vote hung there
+	 * for good, holding the UART wakeup source, so the phone never slept
+	 * again.
+	 */
 	if (port->tx_wq)
 		flush_workqueue(port->tx_wq);
 
@@ -5343,8 +5341,6 @@ static int msm_geni_serial_reconfigure_baud_rate(struct uart_port *uport)
 			     "%s: baud %d\n", __func__, port->cur_baud);
 
 	msm_geni_serial_start_rx(uport);
-	if (!uart_console(uport))
-		msm_geni_serial_power_off(uport);
 	geni_capture_stop_time(&port->se, port->ipc_log_kpi, __func__,
 			       port->uart_kpi, start_time, 0, 0);
 	return ret;
