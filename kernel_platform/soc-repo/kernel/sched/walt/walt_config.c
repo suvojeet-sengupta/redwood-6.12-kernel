@@ -23,6 +23,46 @@ unsigned int soc_cluster_freq_table_size[MAX_CLUSTERS];
 unsigned int soc_cluster_freq_table[MAX_CLUSTERS][MAX_FREQ_TABLE_ENTRIES];
 unsigned int demand_scaling_factor;
 unsigned int min_demand_for_activity_cnt;
+
+/*
+ * redwood (SM7325): start from the tuning redwood's post_boot has always
+ * applied. Its 5.4-era copies in other ROMs write these where 5.4 kept
+ * them, and write upmigrate before downmigrate, which WALT refuses while
+ * downmigrate is still higher; this way the values hold either way.
+ */
+static void walt_config_redwood(void)
+{
+	static const unsigned int up_pct[] = { 71, 95 };
+	static const unsigned int dn_pct[] = { 65, 85 };
+	struct walt_sched_cluster *cluster;
+	int i = 0;
+
+	for_each_sched_cluster(cluster) {
+		if (i >= num_sched_clusters - 1 || i >= ARRAY_SIZE(up_pct))
+			break;
+		sysctl_sched_capacity_margin_up_pct[i] = up_pct[i];
+		sysctl_sched_capacity_margin_dn_pct[i] = dn_pct[i];
+		sched_capacity_margin_up[ANDROID_CGROUP_OTHER][cluster->id] =
+			SCHED_FIXEDPOINT_SCALE * 100 / up_pct[i];
+		sched_capacity_margin_down[ANDROID_CGROUP_OTHER][cluster->id] =
+			SCHED_FIXEDPOINT_SCALE * 100 / dn_pct[i];
+		i++;
+	}
+
+	sysctl_sched_group_upmigrate_pct = 100;
+	sysctl_sched_group_downmigrate_pct = 85;
+	walt_update_group_thresholds();
+
+	sysctl_sched_walt_rotate_big_tasks = 1;
+	sysctl_sched_coloc_busy_hyst_enable_cpus = 0;
+	sysctl_sched_task_unfilter_period = 20000000;
+	sysctl_sched_conservative_pl = 1;
+
+	/* 5.4: input_boost_freq "0:1324800", input_boost_ms 120 */
+	sysctl_input_boost_freq[0] = 1324800;
+	sysctl_input_boost_ms = 120;
+}
+
 void walt_config(void)
 {
 	int i, j, cpu;
@@ -126,6 +166,9 @@ void walt_config(void)
 	/* return if socinfo is not available */
 	if (!name)
 		return;
+
+	if (!strcmp(name, "SM7325"))
+		walt_config_redwood();
 
 	if (!strcmp(name, "SUN") || !strcmp(name, "SUNP") || !strcmp(name, "CANOE")
 			|| !strcmp(name, "ALOR_INTERPOSER") || !strcmp(name, "ALOR")
