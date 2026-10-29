@@ -22,15 +22,12 @@ The kernel calls itself **6.12.81-Suvkernel**.
 Display (120 Hz), touch with double tap to wake, GPU, Wi-Fi, Bluetooth, SIMs
 and mobile data, speakers, earpiece, microphones, video playback, camera,
 fingerprint, IR blaster, vibration, deep sleep, charging with Xiaomi's
-battery authentication, and KernelSU (as a loadable module).
+battery authentication, Widevine L1, and KernelSU (as a loadable module).
 
 Known gaps:
 
 - Fast PD charging (67 W) doesn't start yet: the charger firmware reports
   no PD contract.
-- Widevine stays at L3 and `feature_enabler_client` keeps restarting. The
-  6.12 `smcinvoke` driver changed its ioctl layout and the old vendor
-  libraries don't understand it yet.
 - `memlat` (memory latency governor) doesn't load: the CPUCP firmware on
   redwood lacks the SCMI protocols it needs.
 
@@ -54,6 +51,9 @@ swap the kernel in (see "Using it in a ROM" below):
   phone.
 - **Video.** The video driver labels its `sku_version` node itself, so the
   media script picks redwood's media profiles before SELinux has caught up.
+- **TrustZone.** `smcinvoke` also speaks the 5.4 ioctl layout the old
+  vendor libraries use, and the real `qseecom` driver serves QTEE's listener
+  requests, so Widevine runs at L1 and the feature enabler loads.
 - **No command line changes.** Unused clocks and power domains stay on by
   default, which keeps the boot splash alive until the display takes over.
 
