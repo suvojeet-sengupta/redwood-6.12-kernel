@@ -117,11 +117,17 @@
 };
 
 /*
- * redwood's charger firmware uses Xiaomi's battery property layout, and the
- * thermal levels are redwood's own from 10A (67W charging) down to 500mA.
+ * redwood's charger firmware is Xiaomi's. The driver sends it a thermal level
+ * from its own table of 16; the currents below, redwood's from 10A (67W
+ * charging) down to 500mA, only feed the CLO driver's bookkeeping.
  */
 &battery_charger {
 	qcom,xiaomi-battery-props;
+	/*
+	 * Xiaomi's charger firmware is told when the screen goes off, and
+	 * charges harder then. Either panel may be fitted.
+	 */
+	qcom,display-panels = <&dsi_m20_36_02_0a_dsc_vid &dsi_m20_42_0d_0b_dsc_vid>;
 	qcom,thermal-mitigation = <10000000 9500000 9000000 8500000 8000000
 				   7500000 7000000 6500000 6000000 5500000
 				   5000000 4500000 4000000 3500000 3000000

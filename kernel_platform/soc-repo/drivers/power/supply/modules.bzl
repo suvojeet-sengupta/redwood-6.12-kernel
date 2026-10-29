@@ -7,9 +7,21 @@ def register_modules(registry):
         name = "drivers/power/supply/qti_battery_charger",
         out = "qti_battery_charger.ko",
         config = "CONFIG_QTI_BATTERY_CHARGER",
+        # redwood: the options of Xiaomi's 5.4 redwood build, which pick
+        # the XM property layout its charger firmware speaks
+        copts = [
+            "-DCONFIG_BQ_FG_1S",
+            "-DCONFIG_BQ2597X",
+            "-DCONFIG_BQ_CLOUD_AUTHENTICATION",
+            "-DCONFIG_BQ_FUEL_GAUGE",
+            "-DCONFIG_REDWOOD_FOR_BUILD",
+            "-DCONFIG_AI_RSOC_M20",
+        ],
         srcs = [
             # do not sort
             "drivers/power/supply/qti_battery_charger.c",
+            "drivers/power/supply/qti_battery_charger.h",
+            "drivers/power/supply/qti_battery_charger_xiaomi.c",
             "drivers/power/supply/qti_charger_boost_lib.c",
             "drivers/power/supply/qti_charger_boost_lib.h",
             "drivers/power/supply/qti_typec_class.c",
