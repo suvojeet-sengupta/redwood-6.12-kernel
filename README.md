@@ -8,26 +8,31 @@ ship with) moved onto redwood, which came with a 5.4 kernel. It runs the
 normal 5.4-era vendor and firmware of the phone, so most of the work here is
 making the new kernel speak the way the old vendor blobs expect.
 
-The kernel calls itself **6.12.81-Suvkernel**.
+The kernel calls itself **6.12.96-Suvkernel**: Qualcomm's
+`KERNEL.PLATFORM.5.0` with Google's `android16-6.12` (Linux 6.12.96) merged in.
 
 ## Branches
 
 | Branch | What |
 |---|---|
-| `r48` | **Use this.** Qualcomm `KERNEL.PLATFORM.5.0.r48-00400` with every redwood fix |
-| `main` | The first port, on the older `r35-02100` release. Kept for history |
+| `main` | **Use this.** Qualcomm `KERNEL.PLATFORM.5.0.r48-00400`, its common kernel at `ks-kernel.lnx.5.0.r81` and AOSP `android16-6.12` (6.12.96), with every redwood fix |
+| `r35` | The first port, on the older `r35-02100` release. Kept for history |
 
 ## What works
 
 Display (120 Hz), touch with double tap to wake, GPU, Wi-Fi, Bluetooth, SIMs
 and mobile data, speakers, earpiece, microphones, video playback, camera,
 fingerprint, IR blaster, vibration, deep sleep, charging with Xiaomi's
-battery authentication, Widevine L1, and KernelSU (as a loadable module).
+battery authentication, Widevine L1, USB file transfer, and KernelSU (as a
+loadable module).
 
 Known gaps:
 
 - Fast PD charging (67 W) doesn't start yet: the charger firmware reports
   no PD contract.
+- The panel stays at 120 Hz. Switching it to 90 or 60 Hz, as the 5.4 kernel
+  could, floods the DSI host with FIFO errors until reboot, so dynamic fps is
+  off.
 
 ## Works with any redwood ROM
 
@@ -56,6 +61,12 @@ swap the kernel in (see "Using it in a ROM" below):
   SCMI, which redwood's CPUCP firmware lacks, and the DDR, LLCC and L3
   boot boost ends a minute after boot even though the 5.4 `post_boot`
   doesn't know those nodes.
+- **USB.** A USB-A to USB-C cable counts as connected even though the
+  ADSP reports no Type-C partner for it, so USB preferences and file
+  transfer work.
+- **No stuck CPU pause.** The PMIC battery-current trips clear again once
+  the voltage recovers; a single sag under load used to leave the big cores
+  paused until reboot.
 - **No command line changes.** Unused clocks and power domains stay on by
   default, which keeps the boot splash alive until the display takes over.
 
@@ -72,7 +83,7 @@ zone the fuel gauge's temperature.
 
 | Path | What | Upstream |
 |---|---|---|
-| `kernel_platform/common` | The kernel itself (Android `android16-6.12`) | `ks-kernel.lnx.5.0.r80-rel` |
+| `kernel_platform/common` | The kernel itself (Android `android16-6.12`) | `ks-kernel.lnx.5.0.r81-rel` + AOSP `android16-6.12` (6.12.96) |
 | `kernel_platform/soc-repo` | Qualcomm SoC drivers built as modules | `kernel.lnx.6.12.r69-rel` |
 | `kernel_platform/qcom/opensource/devicetree` | Device trees, redwood's in `qcom/redwood-*` | `kernel.lnx.6.12.r69-rel` |
 | `vendor/display-drivers`, `vendor/mm-drivers` | Display | `display-kernel.lnx.12.13.r1-rel` |
@@ -82,6 +93,11 @@ zone the fuel gauge's temperature.
 | `vendor/camera-kernel` | Camera | `camera-iot-kernel.qclinux.1.1.r5-rel` |
 | `vendor/wlan`, `vendor/dataipa`, `vendor/datarmnet*`, `vendor/securemsm-kernel` | Wi-Fi, mobile data, TrustZone | `LA.VENDOR.16.2.8.r1-06100-LAHAINA.0` |
 | `vendor/redwood-modules` | redwood's own small modules | — |
+
+`soc-repo` and the device trees stay on `r69`: Qualcomm's `r70` is another
+release line that lacks much of `r69`. Qualcomm releases come in as plain
+snapshot commits that the redwood branch then merges, and `android16-6.12`
+is merged into the common kernel the same way.
 
 redwood's hardware description is `qcom/redwood-overlay.dtso` and the
 `qcom/redwood-*.dtsi` files it includes. Every change made for redwood has
@@ -94,7 +110,7 @@ This repository has the sources only. The build system and compilers come
 from Qualcomm's manifest for the same release:
 
 ```
-git clone -b r48 https://github.com/suvojeet-sengupta/redwood-6.12-kernel
+git clone https://github.com/suvojeet-sengupta/redwood-6.12-kernel
 mkdir kp && cd kp
 repo init -u https://git.codelinaro.org/clo/la/kernelplatform/manifest.git \
 	-b release -m KERNEL.PLATFORM.5.0.r48-00400-kernel.0.xml --depth=1
