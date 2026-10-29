@@ -11901,50 +11901,6 @@ static void ipa3_ap_iommu_unmap(struct ipa_smmu_cb_ctx *cb, const u32 *add_map, 
 		}
 	}
 }
-/*
- * redwood: IPA reads the modem filter table in SMEM through a 1:1 map in
- * the AP context bank. A DMA IOVA allocated on top of it (the IOVA
- * reservations once parsed wrong, see redwood-ipa.dtsi) replaced the map;
- * IPA then faulted reading it, hung, and the modem asserted. Keep an eye
- * on the map, say if it ever changes, and put it back.
- */
-static struct {
-	unsigned long iova;
-	phys_addr_t pa;
-	u32 size;
-	struct iommu_domain *domain;
-	unsigned int lost;
-} ipa_smem_map;
-
-static void ipa_smem_map_check(struct work_struct *work);
-static DECLARE_DEFERRABLE_WORK(ipa_smem_map_work, ipa_smem_map_check);
-
-static void ipa_smem_map_check(struct work_struct *work)
-{
-	unsigned long off;
-	int ret;
-
-	for (off = 0; off < ipa_smem_map.size; off += PAGE_SIZE) {
-		phys_addr_t phys = iommu_iova_to_phys(ipa_smem_map.domain,
-						      ipa_smem_map.iova + off);
-
-		if (phys == ipa_smem_map.pa + off)
-			continue;
-
-		ipa_smem_map.lost++;
-		IPAERR_BOOTUP("q6 smem map lost (#%u): iova 0x%lx -> %pa, remapping\n",
-			ipa_smem_map.lost, ipa_smem_map.iova + off, &phys);
-		ret = ipa3_iommu_map(ipa_smem_map.domain, ipa_smem_map.iova,
-				     ipa_smem_map.pa, ipa_smem_map.size,
-				     IOMMU_READ | IOMMU_WRITE);
-		if (ret)
-			IPAERR_BOOTUP("q6 smem remap failed %d\n", ret);
-		break;
-	}
-
-	schedule_delayed_work(&ipa_smem_map_work, 10 * HZ);
-}
-
 static int ipa_smmu_ap_cb_probe(struct device *dev)
 {
 	struct ipa_smmu_cb_ctx *cb = ipa3_get_smmu_ctx(IPA_SMMU_CB_AP);
@@ -12136,26 +12092,13 @@ static int ipa_smmu_ap_cb_probe(struct device *dev)
 		iova = qcom_smem_virt_to_phys(smem_addr);
 		pa = iova;
 
-		/*
-		 * redwood: map the whole item the modem gave us. IPA reads the
-		 * modem filter tables in it through this context; an access past
-		 * a mapping of only qcom,ipa-q6-smem-size is an SMMU fault, after
-		 * which IPA hangs and the modem asserts.
-		 */
-		IPA_SMMU_ROUND_TO_PAGE(iova, pa, max_t(size_t, smem_size, ipa_smem_size),
+		IPA_SMMU_ROUND_TO_PAGE(iova, pa, ipa_smem_size,
 				iova_p, pa_p, size_p);
-		ret = ipa3_iommu_map(cb->iommu_domain,
+		IPADBG("mapping 0x%lx to 0x%pa size %d\n",
+				iova_p, &pa_p, size_p);
+		ipa3_iommu_map(cb->iommu_domain,
 				iova_p, pa_p, size_p,
 				IOMMU_READ | IOMMU_WRITE);
-		IPAERR_BOOTUP("q6 smem filter table at 0x%x, %zu bytes (dt %u), mapped 0x%lx+0x%x: %d\n",
-			pa, smem_size, ipa_smem_size, iova_p, size_p, ret);
-		if (!ret) {
-			ipa_smem_map.iova = iova_p;
-			ipa_smem_map.pa = pa_p;
-			ipa_smem_map.size = size_p;
-			ipa_smem_map.domain = cb->iommu_domain;
-			schedule_delayed_work(&ipa_smem_map_work, 10 * HZ);
-		}
 
 		ipa3_ctx->per_stats_smem_pa = iova;
 		ipa3_ctx->per_stats_smem_va = smem_addr;
