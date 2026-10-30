@@ -1299,6 +1299,9 @@ static int get_charge_control_en(struct battery_chg_dev *bcdev)
 
 	rc = read_property_id(bcdev, &bcdev->psy_list[PSY_TYPE_BATTERY],
 				BATT_CHG_CTRL_EN);
+	/* Xiaomi's firmware doesn't have it: charge control stays off */
+	if (rc == -ENODATA)
+		return rc;
 	if (rc < 0)
 		pr_err("Failed to read the CHG_CTRL_EN, rc = %d\n", rc);
 	else
@@ -1957,7 +1960,7 @@ static ssize_t qti_charger_ro_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", (int)pst->prop[prop_id]);
+	return sysfs_emit(buf, "%d\n", (int)pst->prop[prop_id]);
 }
 
 #define QTI_CHARGER_RO_SHOW(name, psy_type, prop_id)			\
@@ -1985,7 +1988,7 @@ static ssize_t qti_charger_ro_show(const struct class *c,
 	{								\
 		struct battery_chg_dev *bcdev = container_of(c,		\
 				struct battery_chg_dev, battery_class);	\
-		return scnprintf(buf, PAGE_SIZE, "%d\n", bcdev->field);	\
+		return sysfs_emit(buf, "%d\n", bcdev->field);	\
 	}								\
 	static CLASS_ATTR_RW(name)
 
@@ -2003,7 +2006,7 @@ static ssize_t qti_charger_ro_show(const struct class *c,
 		if (rc < 0)						\
 			return rc;					\
 									\
-		return scnprintf(buf, PAGE_SIZE, "%s\n",		\
+		return sysfs_emit(buf, "%s\n",		\
 				get_##psy##_type_name(pst->prop[prop_id]));	\
 	}								\
 	static CLASS_ATTR_RO(name)
@@ -2059,7 +2062,7 @@ static ssize_t wireless_fw_version_show(const struct class *c,
 		return rc;
 	}
 
-	return scnprintf(buf, PAGE_SIZE, "%#x\n", bcdev->wls_fw_version);
+	return sysfs_emit(buf, "%#x\n", bcdev->wls_fw_version);
 }
 static CLASS_ATTR_RO(wireless_fw_version);
 
@@ -2143,7 +2146,7 @@ static ssize_t charge_control_en_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", bcdev->chg_ctrl_en);
+	return sysfs_emit(buf, "%d\n", bcdev->chg_ctrl_en);
 }
 static CLASS_ATTR_RW(charge_control_en);
 
@@ -2338,7 +2341,7 @@ static ssize_t ship_mode_en_show(const struct class *c,
 	struct battery_chg_dev *bcdev = container_of(c, struct battery_chg_dev,
 						battery_class);
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", bcdev->ship_mode_en);
+	return sysfs_emit(buf, "%d\n", bcdev->ship_mode_en);
 }
 static CLASS_ATTR_RW(ship_mode_en);
 
@@ -2356,7 +2359,7 @@ static ssize_t battery_parallel_cell_count_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "Parallel battery cell count (available/total): %lu/%lu\n",
+	return sysfs_emit(buf, "Parallel battery cell count (available/total): %lu/%lu\n",
 		BATT_PARALLEL_CELL_AVAIL_COUNT(pst->prop[BATT_PARALLEL_CELL_COUNT]),
 		BATT_PARALLEL_CELL_TOTAL_COUNT(pst->prop[BATT_PARALLEL_CELL_COUNT]));
 }
