@@ -29,6 +29,7 @@
 #endif
 #include <soc/qcom/of_common.h>
 #include "wlan_firmware_service_v01.h"
+#include "cnss_utils.h"
 #include "main.h"
 #include "qmi.h"
 #include "debug.h"
@@ -957,6 +958,14 @@ int icnss_qmi_get_dms_mac(struct icnss_priv *priv)
 	priv->dms.mac_valid = true;
 	memcpy(priv->dms.mac, resp.mac_address, QMI_WLFW_MAC_ADDR_SIZE_V01);
 	icnss_pr_info("Received DMS MAC: [%pM]\n", priv->dms.mac);
+	/*
+	 * Provision it for the host driver too: qcacld takes the platform MAC
+	 * first and programs it into the firmware. Without it the firmware
+	 * reports none and qcacld makes one up from 00:03:7f and the serial
+	 * number, since nothing else sets the platform MAC on 6.12.
+	 */
+	cnss_utils_set_wlan_mac_address(priv->dms.mac,
+					QMI_WLFW_MAC_ADDR_SIZE_V01);
 out:
 	return ret;
 }
@@ -1110,17 +1119,71 @@ void icnss_dms_deinit(struct icnss_priv *priv)
 	qmi_handle_release(&priv->qmi_dms);
 }
 
+/*
+ * Xiaomi boards carry their own board data, per region: on redwood (project
+ * M20) bd_m20gl.elf, bd_m20in.elf or bd_m20.elf next to the generic files.
+ * 5.4 picked it through Xiaomi's hwid module from the hwid.project and
+ * hwid.hwid_value (country in bits 20-31) the bootloader passes; read them
+ * from the command line in /chosen. The generic bdwlan.elf has the wrong
+ * RF data for redwood and leaves 5 GHz deaf.
+ */
+#define XIAOMI_PROJECT_M20		14
+#define XIAOMI_COUNTRY_GLOBAL		1
+#define XIAOMI_COUNTRY_INDIA		2
+
+static unsigned long icnss_bootarg_ul(const char *args, const char *key)
+{
+	const char *p = args;
+	size_t len = strlen(key);
+
+	while ((p = strstr(p, key))) {
+		if (p == args || p[-1] == ' ')
+			return simple_strtoul(p + len, NULL, 0);
+		p += len;
+	}
+	return 0;
+}
+
+static const char *icnss_xiaomi_bdf_name(void)
+{
+	struct device_node *np = of_find_node_by_path("/chosen");
+	const char *args, *name = NULL;
+	unsigned long country;
+
+	if (!np)
+		return NULL;
+	if (of_property_read_string(np, "bootargs", &args))
+		goto out;
+	if (icnss_bootarg_ul(args, "hwid.project=") != XIAOMI_PROJECT_M20)
+		goto out;
+
+	country = icnss_bootarg_ul(args, "hwid.hwid_value=") >> 20;
+	if (country == XIAOMI_COUNTRY_GLOBAL)
+		name = "bd_m20gl.elf";
+	else if (country == XIAOMI_COUNTRY_INDIA)
+		name = "bd_m20in.elf";
+	else
+		name = "bd_m20.elf";
+out:
+	of_node_put(np);
+	return name;
+}
+
 static int icnss_get_bdf_file_name(struct icnss_priv *priv,
 				   u32 bdf_type, char *filename,
 				   u32 filename_len)
 {
+	const char *xiaomi_bdf;
 	char filename_tmp[ICNSS_MAX_FILE_NAME];
 	char foundry_specific_filename[ICNSS_MAX_FILE_NAME];
 	int ret = 0;
 
 	switch (bdf_type) {
 	case ICNSS_BDF_ELF:
-		if (priv->board_id == 0xFF)
+		xiaomi_bdf = priv->board_id == 0xFF ? icnss_xiaomi_bdf_name() : NULL;
+		if (xiaomi_bdf)
+			snprintf(filename_tmp, filename_len, "%s", xiaomi_bdf);
+		else if (priv->board_id == 0xFF)
 			snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME);
 		else if (priv->board_id < 0xFF)
 			snprintf(filename_tmp, filename_len,
