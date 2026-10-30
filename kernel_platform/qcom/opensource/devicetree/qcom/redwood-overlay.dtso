@@ -119,6 +119,19 @@
 };
 
 /*
+ * The CPUCP log needs SCMI, which redwood's CPUCP doesn't have (it stays
+ * deferred; 5.4 had no such node), and the IOMMU self test is for
+ * debugging only and fails to link to the GPU SMMU
+ */
+&{/soc/qcom,cpucp_log@18509C00} {
+	status = "disabled";
+};
+
+&{/soc/iommu_test_device} {
+	status = "disabled";
+};
+
+/*
  * redwood's firmware uses the older Yupik memory map, the one the 5.4
  * kernel describes: AOP starts at 0x80600000, the ADSP takes 64M, the CDSP
  * sits at 0x9c700000 and the CVP at 0x8b200000. Qualcomm's 6.12 map would
