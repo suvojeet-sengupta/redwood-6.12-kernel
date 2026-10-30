@@ -68,6 +68,57 @@
 };
 
 /*
+ * Give Android back the memory 6.12 sets aside for things redwood's
+ * firmware doesn't run. Its 5.4 device tree has all of these disabled and
+ * none of the carveouts: the trusted VM and its neuron and qrtr channels
+ * (120 MB), the ramdump table (44 MB, ramdump is off on these phones) and
+ * qcom_ramoops' region (2 MB; the ramoops above is the one in use).
+ */
+&{/soc/qcom,trustedvm@d0800000} {
+	status = "disabled";
+};
+
+&{/soc/qcom,guestvm_loader} {
+	status = "disabled";
+};
+
+&{/soc/qcom,svm_neuron_block} {
+	status = "disabled";
+};
+
+&{/soc/qrtr-haven} {
+	status = "disabled";
+};
+
+&{/soc/mem_dump} {
+	status = "disabled";
+};
+
+&{/reserved-memory/pil_trustedvm_region@d0800000} {
+	status = "disabled";
+};
+
+&{/reserved-memory/neuron_block@0} {
+	status = "disabled";
+};
+
+&{/reserved-memory/neuron_block@1} {
+	status = "disabled";
+};
+
+&{/reserved-memory/qrtr-shmem} {
+	status = "disabled";
+};
+
+&{/reserved-memory/dump_mem_region} {
+	status = "disabled";
+};
+
+&{/reserved-memory/ramoops-region} {
+	status = "disabled";
+};
+
+/*
  * redwood's firmware uses the older Yupik memory map, the one the 5.4
  * kernel describes: AOP starts at 0x80600000, the ADSP takes 64M, the CDSP
  * sits at 0x9c700000 and the CVP at 0x8b200000. Qualcomm's 6.12 map would
