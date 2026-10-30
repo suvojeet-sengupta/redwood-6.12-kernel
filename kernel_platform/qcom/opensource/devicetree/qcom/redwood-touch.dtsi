@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /*
- * redwood's Goodix Berlin-D touch controller on SE13 SPI, for the mainline
- * goodix_berlin driver. Pins and supplies are the ones the 5.4 device tree
- * uses for "goodix,brl-d".
+ * redwood's touch controller on SE13 SPI: a Goodix Berlin-D for the mainline
+ * goodix_berlin driver or, with the other panel, a FocalTech FT3680 for
+ * focaltech_touch. Like the 5.4 device tree, one node serves both; the
+ * FocalTech driver reads the panel ID lines and leaves a Goodix panel alone,
+ * and goodix_berlin fails to probe on a FocalTech one. Pins and supplies are
+ * the ones the 5.4 device tree uses.
  */
 
 #include <dt-bindings/gpio/gpio.h>
@@ -33,7 +36,7 @@
 	status = "ok";
 
 	touchscreen@0 {
-		compatible = "goodix,gt9916";
+		compatible = "goodix,gt9916", "focaltech,3680-spi";
 		reg = <0>;
 		spi-max-frequency = <5000000>;
 
@@ -47,5 +50,20 @@
 		/* The controller reports ten times the panel resolution */
 		touchscreen-size-x = <10800>;
 		touchscreen-size-y = <24000>;
+
+		/* FocalTech FT3680: GPIO 96 high and GPIO 68 low */
+		focaltech,id-gpios = <&tlmm 96 GPIO_ACTIVE_HIGH>,
+				     <&tlmm 68 GPIO_ACTIVE_HIGH>;
+		focaltech,irq-gpios = <&tlmm 81 GPIO_ACTIVE_HIGH>;
+		focaltech,reset-gpios = <&tlmm 105 GPIO_ACTIVE_HIGH>;
+		iovdd-supply = <&L2C>;
+		focaltech,max-touch-number = <10>;
+		focaltech,display-coords = <0 0 10800 24000>;
+		focaltech,super-resolution-factors = <10>;
+		focaltech,touch-range-array = <1 5 10 15 20>;
+		focaltech,touch-def-array = <4 3 3 3>;
+		focaltech,touch-expert-array = <10 15 10 10
+						20 15 15 10
+						15 15 20 10>;
 	};
 };
