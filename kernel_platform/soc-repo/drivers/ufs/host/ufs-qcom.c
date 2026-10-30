@@ -6306,7 +6306,8 @@ static void ufs_qcom_register_hooks(void)
 	register_trace_android_vh_ufs_update_sdev(ufs_qcom_update_sdev, NULL);
 }
 
-#ifdef CONFIG_ARM_QCOM_CPUFREQ_HW
+/* cpufreq-hw is a module on lahaina, so #ifdef missed it and UFS never waited */
+#if IS_ENABLED(CONFIG_ARM_QCOM_CPUFREQ_HW)
 static int ufs_cpufreq_status(void)
 {
 	struct cpufreq_policy *policy;
@@ -6652,3 +6653,5 @@ module_platform_driver(ufs_qcom_pltform);
 
 MODULE_DESCRIPTION("Qualcomm UFS host controller driver");
 MODULE_LICENSE("GPL v2");
+/* the CPU frequency votes need cpufreq-hw's policies */
+MODULE_SOFTDEP("pre: qcom-cpufreq-hw");
