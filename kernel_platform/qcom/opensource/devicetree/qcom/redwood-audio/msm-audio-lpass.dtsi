@@ -401,12 +401,22 @@
 		compatible = "qcom,msm-audio-apr";
 		qcom,subsys-name = "apr_adsp";
 
+		/*
+		 * The ADSP gets audio buffers at 0x10000000-0x1fffffff, the 5.4
+		 * qcom,iommu-dma-addr-pool. 6.12 ignores that property, so
+		 * reserve the rest of the 4G instead
+		 */
 		msm_audio_ion: qcom,msm-audio-ion {
 			compatible = "qcom,msm-audio-ion";
 			qcom,smmu-version = <2>;
 			qcom,smmu-enabled;
 			iommus = <&apps_smmu 0x1801 0x0>;
-			qcom,iommu-dma-addr-pool = <0x10000000 0x10000000>;
+			memory-region = <&audio_ion_iommu_region>;
+
+			audio_ion_iommu_region: audio-ion-iommu-region {
+				iommu-addresses = <&msm_audio_ion 0x0 0x10000000>,
+						  <&msm_audio_ion 0x20000000 0xe0000000>;
+			};
 		};
 	};
 

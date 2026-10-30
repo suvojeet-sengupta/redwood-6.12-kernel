@@ -358,22 +358,34 @@
 						"qcom,sde-ebi-bus";
 	};
 
+	/*
+	 * 6.12 ignores qcom,iommu-dma-addr-pool (and warns about it), so keep
+	 * the 5.4 pool of 0x20000 up to 4G by reserving what lies below it
+	 */
 	smmu_sde_unsec: qcom,smmu_sde_unsec_cb {
 		compatible = "qcom,smmu_sde_unsec";
 		iommus = <&apps_smmu 0x900 0x402>;
-		qcom,iommu-dma-addr-pool = <0x00020000 0xfffe0000>;
+		memory-region = <&sde_unsec_iommu_region>;
 		qcom,iommu-faults = "non-fatal";
 		qcom,iommu-earlymap; /* for cont-splash */
 		dma-coherent-hint-cached;
+
+		sde_unsec_iommu_region: sde-unsec-iommu-region {
+			iommu-addresses = <&smmu_sde_unsec 0x0 0x20000>;
+		};
 	};
 
 	smmu_sde_sec: qcom,smmu_sde_sec_cb {
 		compatible = "qcom,smmu_sde_sec";
 		iommus = <&apps_smmu 0x901 0x0>,
 			<&apps_smmu 0xD01 0x0>;
-		qcom,iommu-dma-addr-pool = <0x00020000 0xfffe0000>;
+		memory-region = <&sde_sec_iommu_region>;
 		qcom,iommu-faults = "non-fatal";
 		qcom,iommu-vmid = <0xa>;
+
+		sde_sec_iommu_region: sde-sec-iommu-region {
+			iommu-addresses = <&smmu_sde_sec 0x0 0x20000>;
+		};
 	};
 };
 
