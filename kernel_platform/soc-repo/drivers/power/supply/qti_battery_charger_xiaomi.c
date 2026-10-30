@@ -269,7 +269,7 @@ static ssize_t wireless_input_curr_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[WLS_INPUT_CURR]);
+	return sysfs_emit(buf, "%d\n", pst->prop[WLS_INPUT_CURR]);
 }
 static CLASS_ATTR_RW(wireless_input_curr);
 
@@ -307,7 +307,7 @@ static ssize_t wireless_chip_fw_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%s\n", pst->version);
+	return sysfs_emit(buf, "%s\n", pst->version);
 }
 static CLASS_ATTR_RW(wireless_chip_fw);
 #endif
@@ -327,8 +327,8 @@ static ssize_t real_type_show(const struct class *c, const struct class_attribut
 	if (pst->prop[XM_PROP_REAL_TYPE] >= ARRAY_SIZE(xm_usb_type_text))
 		pst->prop[XM_PROP_REAL_TYPE] = 0;
 
-	return scnprintf(buf, PAGE_SIZE, "%s\n",
-			 xm_usb_type_text[pst->prop[XM_PROP_REAL_TYPE]]);
+	return sysfs_emit(buf, "%s\n",
+			  xm_usb_type_text[pst->prop[XM_PROP_REAL_TYPE]]);
 }
 static CLASS_ATTR_RO(real_type);
 
@@ -344,8 +344,8 @@ static ssize_t resistance_id_show(const struct class *c, const struct class_attr
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_RESISTANCE_ID]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_RESISTANCE_ID]);
 }
 static CLASS_ATTR_RO(resistance_id);
 
@@ -438,7 +438,7 @@ static ssize_t verify_slave_flag_show(const struct class *c,
 	struct battery_chg_dev *bcdev =
 		container_of(c, struct battery_chg_dev, battery_class);
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", bcdev->slave_fg_verify_flag);
+	return sysfs_emit(buf, "%u\n", bcdev->slave_fg_verify_flag);
 }
 static CLASS_ATTR_RW(verify_slave_flag);
 
@@ -525,8 +525,8 @@ static ssize_t connector_temp_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_CONNECTOR_TEMP]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_CONNECTOR_TEMP]);
 }
 static CLASS_ATTR_RW(connector_temp);
 
@@ -563,7 +563,7 @@ static ssize_t authentic_show(const struct class *c, const struct class_attribut
 		return rc;
 
 	pr_err("authentic_show: %d\n", pst->prop[XM_PROP_AUTHENTIC]);
-	return scnprintf(buf, PAGE_SIZE, "%u\n", pst->prop[XM_PROP_AUTHENTIC]);
+	return sysfs_emit(buf, "%u\n", pst->prop[XM_PROP_AUTHENTIC]);
 }
 static CLASS_ATTR_RW(authentic);
 
@@ -579,7 +579,7 @@ static ssize_t chip_ok_show(const struct class *c, const struct class_attribute 
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", pst->prop[XM_PROP_CHIP_OK]);
+	return sysfs_emit(buf, "%u\n", pst->prop[XM_PROP_CHIP_OK]);
 }
 static CLASS_ATTR_RO(chip_ok);
 
@@ -596,8 +596,8 @@ static ssize_t slave_chip_ok_show(const struct class *c, const struct class_attr
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_SLAVE_CHIP_OK]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_SLAVE_CHIP_OK]);
 }
 static CLASS_ATTR_RO(slave_chip_ok);
 
@@ -635,8 +635,8 @@ static ssize_t slave_authentic_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_SLAVE_AUTHENTIC]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_SLAVE_AUTHENTIC]);
 }
 static CLASS_ATTR_RW(slave_authentic);
 
@@ -652,7 +652,7 @@ static ssize_t fg1_vol_show(const struct class *c, const struct class_attribute 
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", pst->prop[XM_PROP_FG1_VOL]);
+	return sysfs_emit(buf, "%u\n", pst->prop[XM_PROP_FG1_VOL]);
 }
 static CLASS_ATTR_RO(fg1_vol);
 
@@ -668,7 +668,7 @@ static ssize_t fg1_soc_show(const struct class *c, const struct class_attribute 
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", pst->prop[XM_PROP_FG1_SOC]);
+	return sysfs_emit(buf, "%u\n", pst->prop[XM_PROP_FG1_SOC]);
 }
 static CLASS_ATTR_RO(fg1_soc);
 
@@ -684,7 +684,7 @@ static ssize_t fg1_temp_show(const struct class *c, const struct class_attribute
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG1_TEMP]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG1_TEMP]);
 }
 static CLASS_ATTR_RO(fg1_temp);
 
@@ -700,7 +700,7 @@ static ssize_t fg1_ibatt_show(const struct class *c, const struct class_attribut
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG1_IBATT]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG1_IBATT]);
 }
 static CLASS_ATTR_RO(fg1_ibatt);
 
@@ -716,7 +716,7 @@ static ssize_t fg2_vol_show(const struct class *c, const struct class_attribute 
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", pst->prop[XM_PROP_FG2_VOL]);
+	return sysfs_emit(buf, "%u\n", pst->prop[XM_PROP_FG2_VOL]);
 }
 static CLASS_ATTR_RO(fg2_vol);
 
@@ -732,7 +732,7 @@ static ssize_t fg2_soc_show(const struct class *c, const struct class_attribute 
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", pst->prop[XM_PROP_FG2_SOC]);
+	return sysfs_emit(buf, "%u\n", pst->prop[XM_PROP_FG2_SOC]);
 }
 static CLASS_ATTR_RO(fg2_soc);
 
@@ -748,7 +748,7 @@ static ssize_t fg2_temp_show(const struct class *c, const struct class_attribute
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG2_TEMP]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG2_TEMP]);
 }
 static CLASS_ATTR_RO(fg2_temp);
 
@@ -764,7 +764,7 @@ static ssize_t fg2_ibatt_show(const struct class *c, const struct class_attribut
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG2_IBATT]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG2_IBATT]);
 }
 static CLASS_ATTR_RO(fg2_ibatt);
 
@@ -780,7 +780,7 @@ static ssize_t fg2_qmax_show(const struct class *c, const struct class_attribute
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG2_QMAX]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG2_QMAX]);
 }
 static CLASS_ATTR_RO(fg2_qmax);
 
@@ -796,7 +796,7 @@ static ssize_t fg2_rm_show(const struct class *c, const struct class_attribute *
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG2_RM]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG2_RM]);
 }
 static CLASS_ATTR_RO(fg2_rm);
 
@@ -812,7 +812,7 @@ static ssize_t fg2_fcc_show(const struct class *c, const struct class_attribute 
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG2_FCC]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG2_FCC]);
 }
 static CLASS_ATTR_RO(fg2_fcc);
 
@@ -828,7 +828,7 @@ static ssize_t fg2_soh_show(const struct class *c, const struct class_attribute 
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG2_SOH]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG2_SOH]);
 }
 static CLASS_ATTR_RO(fg2_soh);
 
@@ -844,8 +844,8 @@ static ssize_t fg2_fcc_soh_show(const struct class *c, const struct class_attrib
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n",
-			 pst->prop[XM_PROP_FG2_FCC_SOH]);
+	return sysfs_emit(buf, "%d\n",
+			  pst->prop[XM_PROP_FG2_FCC_SOH]);
 }
 static CLASS_ATTR_RO(fg2_fcc_soh);
 
@@ -861,7 +861,7 @@ static ssize_t fg2_cycle_show(const struct class *c, const struct class_attribut
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG2_CYCLE]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG2_CYCLE]);
 }
 static CLASS_ATTR_RO(fg2_cycle);
 
@@ -877,8 +877,8 @@ static ssize_t fg2_fastcharge_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n",
-			 pst->prop[XM_PROP_FG2_FAST_CHARGE]);
+	return sysfs_emit(buf, "%d\n",
+			  pst->prop[XM_PROP_FG2_FAST_CHARGE]);
 }
 static CLASS_ATTR_RO(fg2_fastcharge);
 
@@ -894,8 +894,8 @@ static ssize_t fg2_current_max_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n",
-			 pst->prop[XM_PROP_FG2_CURRENT_MAX]);
+	return sysfs_emit(buf, "%d\n",
+			  pst->prop[XM_PROP_FG2_CURRENT_MAX]);
 }
 static CLASS_ATTR_RO(fg2_current_max);
 
@@ -911,8 +911,8 @@ static ssize_t fg2_vol_max_show(const struct class *c, const struct class_attrib
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n",
-			 pst->prop[XM_PROP_FG2_VOL_MAX]);
+	return sysfs_emit(buf, "%d\n",
+			  pst->prop[XM_PROP_FG2_VOL_MAX]);
 }
 static CLASS_ATTR_RO(fg2_vol_max);
 
@@ -928,7 +928,7 @@ static ssize_t fg2_tsim_show(const struct class *c, const struct class_attribute
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG2_TSIM]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG2_TSIM]);
 }
 static CLASS_ATTR_RO(fg2_tsim);
 
@@ -944,8 +944,8 @@ static ssize_t fg2_tambient_show(const struct class *c, const struct class_attri
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n",
-			 pst->prop[XM_PROP_FG2_TAMBIENT]);
+	return sysfs_emit(buf, "%d\n",
+			  pst->prop[XM_PROP_FG2_TAMBIENT]);
 }
 static CLASS_ATTR_RO(fg2_tambient);
 
@@ -961,7 +961,7 @@ static ssize_t fg2_tremq_show(const struct class *c, const struct class_attribut
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG2_TREMQ]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG2_TREMQ]);
 }
 static CLASS_ATTR_RO(fg2_tremq);
 
@@ -977,7 +977,7 @@ static ssize_t fg2_tfullq_show(const struct class *c, const struct class_attribu
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG2_TFULLQ]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG2_TFULLQ]);
 }
 static CLASS_ATTR_RO(fg2_tfullq);
 
@@ -1012,7 +1012,7 @@ static ssize_t is_old_hw_show(const struct class *c, const struct class_attribut
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", pst->prop[XM_PROP_IS_OLD_HW]);
+	return sysfs_emit(buf, "%u\n", pst->prop[XM_PROP_IS_OLD_HW]);
 }
 static CLASS_ATTR_RW(is_old_hw);
 #endif
@@ -1048,8 +1048,8 @@ static ssize_t vbus_disable_show(const struct class *c, const struct class_attri
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_VBUS_DISABLE]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_VBUS_DISABLE]);
 }
 static CLASS_ATTR_RW(vbus_disable);
 
@@ -1065,8 +1065,8 @@ static ssize_t cc_orientation_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_CC_ORIENTATION]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_CC_ORIENTATION]);
 }
 static CLASS_ATTR_RO(cc_orientation);
 
@@ -1082,8 +1082,8 @@ static ssize_t slave_batt_present_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_SLAVE_BATT_PRESENT]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_SLAVE_BATT_PRESENT]);
 }
 static CLASS_ATTR_RO(slave_batt_present);
 
@@ -1100,8 +1100,8 @@ static ssize_t bq2597x_chip_ok_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_BQ2597X_CHIP_OK]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_BQ2597X_CHIP_OK]);
 }
 static CLASS_ATTR_RO(bq2597x_chip_ok);
 
@@ -1118,8 +1118,8 @@ static ssize_t bq2597x_slave_chip_ok_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_BQ2597X_SLAVE_CHIP_OK]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_BQ2597X_SLAVE_CHIP_OK]);
 }
 static CLASS_ATTR_RO(bq2597x_slave_chip_ok);
 
@@ -1135,8 +1135,8 @@ static ssize_t bq2597x_bus_current_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_BQ2597X_BUS_CURRENT]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_BQ2597X_BUS_CURRENT]);
 }
 static CLASS_ATTR_RO(bq2597x_bus_current);
 
@@ -1153,8 +1153,8 @@ static ssize_t bq2597x_slave_bus_current_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_BQ2597X_SLAVE_BUS_CURRENT]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_BQ2597X_SLAVE_BUS_CURRENT]);
 }
 static CLASS_ATTR_RO(bq2597x_slave_bus_current);
 
@@ -1170,8 +1170,8 @@ static ssize_t bq2597x_bus_delta_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_BQ2597X_BUS_DELTA]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_BQ2597X_BUS_DELTA]);
 }
 static CLASS_ATTR_RO(bq2597x_bus_delta);
 
@@ -1187,8 +1187,8 @@ static ssize_t bq2597x_bus_voltage_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_BQ2597X_BUS_VOLTAGE]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_BQ2597X_BUS_VOLTAGE]);
 }
 static CLASS_ATTR_RO(bq2597x_bus_voltage);
 
@@ -1205,8 +1205,8 @@ static ssize_t bq2597x_battery_present_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_BQ2597X_BATTERY_PRESENT]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_BQ2597X_BATTERY_PRESENT]);
 }
 static CLASS_ATTR_RO(bq2597x_battery_present);
 
@@ -1224,8 +1224,8 @@ static ssize_t bq2597x_slave_battery_present_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_BQ2597X_SLAVE_BATTERY_PRESENT]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_BQ2597X_SLAVE_BATTERY_PRESENT]);
 }
 static CLASS_ATTR_RO(bq2597x_slave_battery_present);
 static ssize_t bq2597x_battery_voltage_show(const struct class *c,
@@ -1241,8 +1241,8 @@ static ssize_t bq2597x_battery_voltage_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_BQ2597X_BATTERY_VOLTAGE]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_BQ2597X_BATTERY_VOLTAGE]);
 }
 static CLASS_ATTR_RO(bq2597x_battery_voltage);
 
@@ -1277,7 +1277,7 @@ static ssize_t cool_mode_show(const struct class *c, const struct class_attribut
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", pst->prop[XM_PROP_COOL_MODE]);
+	return sysfs_emit(buf, "%u\n", pst->prop[XM_PROP_COOL_MODE]);
 }
 static CLASS_ATTR_RW(cool_mode);
 #endif
@@ -1295,7 +1295,7 @@ static ssize_t bq2597x_slave_connector_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", pst->prop[XM_PROP_BQ2597X_SLAVE_CONNECTOR]);
+	return sysfs_emit(buf, "%u\n", pst->prop[XM_PROP_BQ2597X_SLAVE_CONNECTOR]);
 }
 static CLASS_ATTR_RO(bq2597x_slave_connector);
 #endif
@@ -1347,8 +1347,8 @@ static ssize_t bt_transfer_start_show(const struct class *c,
 		return rc;
 	pr_err("transfer_start_show %d\n",
 	       pst->prop[XM_PROP_BT_TRANSFER_START]);
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_BT_TRANSFER_START]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_BT_TRANSFER_START]);
 }
 static CLASS_ATTR_RW(bt_transfer_start);
 #endif
@@ -1366,8 +1366,8 @@ static ssize_t master_smb1396_online_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_MASTER_SMB1396_ONLINE]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_MASTER_SMB1396_ONLINE]);
 }
 static CLASS_ATTR_RO(master_smb1396_online);
 
@@ -1383,8 +1383,8 @@ static ssize_t master_smb1396_iin_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_MASTER_SMB1396_IIN]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_MASTER_SMB1396_IIN]);
 }
 static CLASS_ATTR_RO(master_smb1396_iin);
 
@@ -1401,8 +1401,8 @@ static ssize_t slave_smb1396_online_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_SLAVE_SMB1396_ONLINE]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_SLAVE_SMB1396_ONLINE]);
 }
 static CLASS_ATTR_RO(slave_smb1396_online);
 
@@ -1418,8 +1418,8 @@ static ssize_t slave_smb1396_iin_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_SLAVE_SMB1396_IIN]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_SLAVE_SMB1396_IIN]);
 }
 static CLASS_ATTR_RO(slave_smb1396_iin);
 
@@ -1435,8 +1435,8 @@ static ssize_t smb_iin_diff_show(const struct class *c, const struct class_attri
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_SMB_IIN_DIFF]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_SMB_IIN_DIFF]);
 }
 static CLASS_ATTR_RO(smb_iin_diff);
 
@@ -1452,7 +1452,7 @@ static ssize_t soc_decimal_show(const struct class *c, const struct class_attrib
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u", pst->prop[XM_PROP_SOC_DECIMAL]);
+	return sysfs_emit(buf, "%u", pst->prop[XM_PROP_SOC_DECIMAL]);
 }
 static CLASS_ATTR_RO(soc_decimal);
 
@@ -1468,8 +1468,8 @@ static ssize_t soc_decimal_rate_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u",
-			 pst->prop[XM_PROP_SOC_DECIMAL_RATE]);
+	return sysfs_emit(buf, "%u",
+			  pst->prop[XM_PROP_SOC_DECIMAL_RATE]);
 }
 static CLASS_ATTR_RO(soc_decimal_rate);
 
@@ -1488,8 +1488,8 @@ static ssize_t shutdown_delay_show(const struct class *c,
 	if (!bcdev->shutdown_delay_en)
 		pst->prop[XM_PROP_SHUTDOWN_DELAY] = 0;
 
-	return scnprintf(buf, PAGE_SIZE, "%u",
-			 pst->prop[XM_PROP_SHUTDOWN_DELAY]);
+	return sysfs_emit(buf, "%u",
+			  pst->prop[XM_PROP_SHUTDOWN_DELAY]);
 }
 
 static ssize_t shutdown_delay_store(const struct class *c,
@@ -1532,7 +1532,7 @@ static ssize_t tx_mac_show(const struct class *c, const struct class_attribute *
 	value = pst->prop[XM_PROP_TX_MACH];
 	value = (value << 32) + pst->prop[XM_PROP_TX_MACL];
 
-	return scnprintf(buf, PAGE_SIZE, "%llx", value);
+	return sysfs_emit(buf, "%llx", value);
 }
 static CLASS_ATTR_RO(tx_mac);
 
@@ -1554,7 +1554,7 @@ static ssize_t rx_cr_show(const struct class *c, const struct class_attribute *a
 	value = pst->prop[XM_PROP_RX_CRH];
 	value = (value << 32) + pst->prop[XM_PROP_RX_CRL];
 
-	return scnprintf(buf, PAGE_SIZE, "%llx", value);
+	return sysfs_emit(buf, "%llx", value);
 }
 static CLASS_ATTR_RO(rx_cr);
 
@@ -1570,7 +1570,7 @@ static ssize_t rx_cep_show(const struct class *c, const struct class_attribute *
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%x", pst->prop[XM_PROP_RX_CEP]);
+	return sysfs_emit(buf, "%x", pst->prop[XM_PROP_RX_CEP]);
 }
 static CLASS_ATTR_RO(rx_cep);
 
@@ -1605,7 +1605,7 @@ static ssize_t bt_state_show(const struct class *c, const struct class_attribute
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u", pst->prop[XM_PROP_BT_STATE]);
+	return sysfs_emit(buf, "%u", pst->prop[XM_PROP_BT_STATE]);
 }
 static CLASS_ATTR_RW(bt_state);
 #endif
@@ -1641,7 +1641,7 @@ static ssize_t voter_debug_show(const struct class *c, const struct class_attrib
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u", pst->prop[XM_PROP_VOTER_DEBUG]);
+	return sysfs_emit(buf, "%u", pst->prop[XM_PROP_VOTER_DEBUG]);
 }
 static CLASS_ATTR_RW(voter_debug);
 
@@ -1700,8 +1700,8 @@ static ssize_t wlscharge_control_limit_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u",
-			 pst->prop[XM_PROP_WLSCHARGE_CONTROL_LIMIT]);
+	return sysfs_emit(buf, "%u",
+			  pst->prop[XM_PROP_WLSCHARGE_CONTROL_LIMIT]);
 }
 static CLASS_ATTR_RW(wlscharge_control_limit);
 
@@ -1748,8 +1748,8 @@ static ssize_t reverse_chg_mode_show(const struct class *c,
 		bcdev->reverse_chg_flag = pst->prop[XM_PROP_REVERSE_CHG_MODE];
 	}
 
-	return scnprintf(buf, PAGE_SIZE, "%u",
-			 pst->prop[XM_PROP_REVERSE_CHG_MODE]);
+	return sysfs_emit(buf, "%u",
+			  pst->prop[XM_PROP_REVERSE_CHG_MODE]);
 
 out:
 	dev_err(bcdev->dev, "read reverse chg mode error\n");
@@ -1788,7 +1788,7 @@ static ssize_t wls_tx_speed_show(const struct class *c, const struct class_attri
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u", pst->prop[XM_PROP_WLS_TX_SPEED]);
+	return sysfs_emit(buf, "%u", pst->prop[XM_PROP_WLS_TX_SPEED]);
 }
 static CLASS_ATTR_RW(wls_tx_speed);
 #endif
@@ -1805,8 +1805,8 @@ static ssize_t reverse_chg_state_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u",
-			 pst->prop[XM_PROP_REVERSE_CHG_STATE]);
+	return sysfs_emit(buf, "%u",
+			  pst->prop[XM_PROP_REVERSE_CHG_STATE]);
 }
 static CLASS_ATTR_RO(reverse_chg_state);
 #if 0
@@ -1822,7 +1822,7 @@ static ssize_t wls_fw_state_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u", pst->prop[XM_PROP_WLS_FW_STATE]);
+	return sysfs_emit(buf, "%u", pst->prop[XM_PROP_WLS_FW_STATE]);
 }
 static CLASS_ATTR_RO(wls_fw_state);
 #endif
@@ -1838,8 +1838,8 @@ static ssize_t wls_car_adapter_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u",
-			 pst->prop[XM_PROP_WLS_CAR_ADAPTER]);
+	return sysfs_emit(buf, "%u",
+			  pst->prop[XM_PROP_WLS_CAR_ADAPTER]);
 }
 static CLASS_ATTR_RO(wls_car_adapter);
 
@@ -1855,7 +1855,7 @@ static ssize_t rx_vout_show(const struct class *c, const struct class_attribute 
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u", pst->prop[XM_PROP_RX_VOUT]);
+	return sysfs_emit(buf, "%u", pst->prop[XM_PROP_RX_VOUT]);
 }
 static CLASS_ATTR_RO(rx_vout);
 
@@ -1871,7 +1871,7 @@ static ssize_t rx_vrect_show(const struct class *c, const struct class_attribute
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u", pst->prop[XM_PROP_RX_VRECT]);
+	return sysfs_emit(buf, "%u", pst->prop[XM_PROP_RX_VRECT]);
 }
 static CLASS_ATTR_RO(rx_vrect);
 
@@ -1887,7 +1887,7 @@ static ssize_t rx_iout_show(const struct class *c, const struct class_attribute 
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u", pst->prop[XM_PROP_RX_IOUT]);
+	return sysfs_emit(buf, "%u", pst->prop[XM_PROP_RX_IOUT]);
 }
 static CLASS_ATTR_RO(rx_iout);
 
@@ -1903,7 +1903,7 @@ static ssize_t tx_adapter_show(const struct class *c, const struct class_attribu
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u", pst->prop[XM_PROP_TX_ADAPTER]);
+	return sysfs_emit(buf, "%u", pst->prop[XM_PROP_TX_ADAPTER]);
 }
 static CLASS_ATTR_RO(tx_adapter);
 
@@ -1919,7 +1919,7 @@ static ssize_t op_mode_show(const struct class *c, const struct class_attribute 
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u", pst->prop[XM_PROP_OP_MODE]);
+	return sysfs_emit(buf, "%u", pst->prop[XM_PROP_OP_MODE]);
 }
 static CLASS_ATTR_RO(op_mode);
 
@@ -1935,7 +1935,7 @@ static ssize_t wls_die_temp_show(const struct class *c, const struct class_attri
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u", pst->prop[XM_PROP_WLS_DIE_TEMP]);
+	return sysfs_emit(buf, "%u", pst->prop[XM_PROP_WLS_DIE_TEMP]);
 }
 static CLASS_ATTR_RO(wls_die_temp);
 #endif
@@ -1964,29 +1964,29 @@ static ssize_t power_max_show(const struct class *c, const struct class_attribut
 		rc = read_property_id(bcdev, xm_pst, XM_PROP_APDO_MAX);
 		if (rc < 0)
 			return rc;
-		return scnprintf(buf, PAGE_SIZE, "%u",
-				 xm_pst->prop[XM_PROP_APDO_MAX]);
+		return sysfs_emit(buf, "%u",
+				  xm_pst->prop[XM_PROP_APDO_MAX]);
 	}
 	pr_err("tx_adapter:%d\n", xm_pst->prop[XM_PROP_TX_ADAPTER]);
 #if defined(CONFIG_MI_WIRELESS)
 	switch (xm_pst->prop[XM_PROP_TX_ADAPTER]) {
 	case ADAPTER_XIAOMI_PD_50W:
-		return scnprintf(buf, PAGE_SIZE, "%u", 50);
+		return sysfs_emit(buf, "%u", 50);
 	case ADAPTER_XIAOMI_PD_60W:
 	case ADAPTER_XIAOMI_PD_100W:
-		return scnprintf(buf, PAGE_SIZE, "%u", 67);
+		return sysfs_emit(buf, "%u", 67);
 	case ADAPTER_XIAOMI_PD_30W:
 	case ADAPTER_VOICE_BOX_30W:
-		return scnprintf(buf, PAGE_SIZE, "%u", 30);
+		return sysfs_emit(buf, "%u", 30);
 	case ADAPTER_XIAOMI_QC3_20W:
 	case ADAPTER_XIAOMI_PD_20W:
 	case ADAPTER_XIAOMI_CAR_20W:
-		return scnprintf(buf, PAGE_SIZE, "%u", 20);
+		return sysfs_emit(buf, "%u", 20);
 	default:
-		return scnprintf(buf, PAGE_SIZE, "%u", 0);
+		return sysfs_emit(buf, "%u", 0);
 	}
 #endif
-	return scnprintf(buf, PAGE_SIZE, "%u", 0);
+	return sysfs_emit(buf, "%u", 0);
 }
 static CLASS_ATTR_RO(power_max);
 
@@ -2024,8 +2024,8 @@ static ssize_t input_suspend_show(const struct class *c, const struct class_attr
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_INPUT_SUSPEND]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_INPUT_SUSPEND]);
 }
 static CLASS_ATTR_RW(input_suspend);
 
@@ -2063,8 +2063,8 @@ static ssize_t night_charging_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_NIGHT_CHARGING]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_NIGHT_CHARGING]);
 }
 static CLASS_ATTR_RW(night_charging);
 
@@ -2102,7 +2102,7 @@ static ssize_t smart_batt_show(const struct class *c, const struct class_attribu
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", pst->prop[XM_PROP_SMART_BATT]);
+	return sysfs_emit(buf, "%u\n", pst->prop[XM_PROP_SMART_BATT]);
 }
 static CLASS_ATTR_RW(smart_batt);
 #endif
@@ -2139,8 +2139,8 @@ static ssize_t verify_process_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_VERIFY_PROCESS]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_VERIFY_PROCESS]);
 }
 static CLASS_ATTR_RW(verify_process);
 
@@ -2257,20 +2257,20 @@ static ssize_t request_vdm_cmd_show(const struct class *c,
 	case USBPD_UVDM_CHARGER_VERSION:
 		prop_id = XM_PROP_VDM_CMD_CHARGER_VERSION;
 		rc = read_property_id(bcdev, pst, prop_id);
-		return snprintf(buf, PAGE_SIZE, "%d,%d", cmd,
-				pst->prop[prop_id]);
+		return sysfs_emit(buf, "%d,%d", cmd,
+				  pst->prop[prop_id]);
 		break;
 	case USBPD_UVDM_CHARGER_TEMP:
 		prop_id = XM_PROP_VDM_CMD_CHARGER_TEMP;
 		rc = read_property_id(bcdev, pst, prop_id);
-		return snprintf(buf, PAGE_SIZE, "%d,%d", cmd,
-				pst->prop[prop_id]);
+		return sysfs_emit(buf, "%d,%d", cmd,
+				  pst->prop[prop_id]);
 		break;
 	case USBPD_UVDM_CHARGER_VOLTAGE:
 		prop_id = XM_PROP_VDM_CMD_CHARGER_VOLTAGE;
 		rc = read_property_id(bcdev, pst, prop_id);
-		return snprintf(buf, PAGE_SIZE, "%d,%d", cmd,
-				pst->prop[prop_id]);
+		return sysfs_emit(buf, "%d,%d", cmd,
+				  pst->prop[prop_id]);
 		break;
 	case USBPD_UVDM_CONNECT:
 	case USBPD_UVDM_DISCONNECT:
@@ -2278,7 +2278,7 @@ static ssize_t request_vdm_cmd_show(const struct class *c,
 	case USBPD_UVDM_VERIFIED:
 	case USBPD_UVDM_REMOVE_COMPENSATION:
 	case USBPD_UVDM_REVERSE_AUTHEN:
-		return snprintf(buf, PAGE_SIZE, "%d,Null", cmd);
+		return sysfs_emit(buf, "%d,Null", cmd);
 		break;
 	case USBPD_UVDM_AUTHENTICATION:
 		prop_id = XM_PROP_VDM_CMD_AUTHENTICATION;
@@ -2294,14 +2294,14 @@ static ssize_t request_vdm_cmd_show(const struct class *c,
 				 bcdev->ss_auth_data[i]);
 			strlcat(str_buf, data, sizeof(str_buf));
 		}
-		return snprintf(buf, PAGE_SIZE, "%d,%s", cmd, str_buf);
+		return sysfs_emit(buf, "%d,%s", cmd, str_buf);
 		break;
 	default:
 		pr_info("feedbak cmd:%d is not support\n", cmd);
 		break;
 	}
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", pst->prop[prop_id]);
+	return sysfs_emit(buf, "%u\n", pst->prop[prop_id]);
 }
 static CLASS_ATTR_RW(request_vdm_cmd);
 
@@ -2324,13 +2324,13 @@ static ssize_t current_state_show(const struct class *c, const struct class_attr
 	if (rc < 0)
 		return rc;
 	if (pst->prop[XM_PROP_CURRENT_STATE] == 25)
-		return snprintf(buf, PAGE_SIZE, "%s", usbpd_state_strings[1]);
+		return sysfs_emit(buf, "%s", usbpd_state_strings[1]);
 	else if (pst->prop[XM_PROP_CURRENT_STATE] == 31)
-		return snprintf(buf, PAGE_SIZE, "%s", usbpd_state_strings[2]);
+		return sysfs_emit(buf, "%s", usbpd_state_strings[2]);
 	else if (pst->prop[XM_PROP_CURRENT_STATE] == 5)
-		return snprintf(buf, PAGE_SIZE, "%s", usbpd_state_strings[3]);
+		return sysfs_emit(buf, "%s", usbpd_state_strings[3]);
 	else
-		return snprintf(buf, PAGE_SIZE, "%s", usbpd_state_strings[0]);
+		return sysfs_emit(buf, "%s", usbpd_state_strings[0]);
 }
 static CLASS_ATTR_RO(current_state);
 
@@ -2346,7 +2346,7 @@ static ssize_t adapter_id_show(const struct class *c, const struct class_attribu
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%08x", pst->prop[XM_PROP_ADAPTER_ID]);
+	return sysfs_emit(buf, "%08x", pst->prop[XM_PROP_ADAPTER_ID]);
 }
 static CLASS_ATTR_RO(adapter_id);
 
@@ -2362,8 +2362,8 @@ static ssize_t adapter_svid_show(const struct class *c, const struct class_attri
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%04x",
-			 pst->prop[XM_PROP_ADAPTER_SVID]);
+	return sysfs_emit(buf, "%04x",
+			  pst->prop[XM_PROP_ADAPTER_SVID]);
 }
 static CLASS_ATTR_RO(adapter_svid);
 
@@ -2398,7 +2398,7 @@ static ssize_t pd_verifed_show(const struct class *c, const struct class_attribu
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", pst->prop[XM_PROP_PD_VERIFED]);
+	return sysfs_emit(buf, "%u\n", pst->prop[XM_PROP_PD_VERIFED]);
 }
 static CLASS_ATTR_RW(pd_verifed);
 
@@ -2414,7 +2414,7 @@ static ssize_t pdo2_show(const struct class *c, const struct class_attribute *at
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%08x\n", pst->prop[XM_PROP_PDO2]);
+	return sysfs_emit(buf, "%08x\n", pst->prop[XM_PROP_PDO2]);
 }
 static CLASS_ATTR_RO(pdo2);
 
@@ -2430,8 +2430,8 @@ static ssize_t fastchg_mode_show(const struct class *c, const struct class_attri
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_FASTCHGMODE]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_FASTCHGMODE]);
 }
 static CLASS_ATTR_RO(fastchg_mode);
 
@@ -2447,7 +2447,7 @@ static ssize_t apdo_max_show(const struct class *c, const struct class_attribute
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", pst->prop[XM_PROP_APDO_MAX]);
+	return sysfs_emit(buf, "%u\n", pst->prop[XM_PROP_APDO_MAX]);
 }
 static CLASS_ATTR_RO(apdo_max);
 
@@ -2483,8 +2483,8 @@ static ssize_t thermal_remove_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_THERMAL_REMOVE]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_THERMAL_REMOVE]);
 }
 static CLASS_ATTR_RW(thermal_remove);
 
@@ -2500,7 +2500,7 @@ static ssize_t fg_rm_show(const struct class *c, const struct class_attribute *a
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", pst->prop[XM_PROP_FG_RM]);
+	return sysfs_emit(buf, "%u\n", pst->prop[XM_PROP_FG_RM]);
 }
 static CLASS_ATTR_RO(fg_rm);
 
@@ -2535,8 +2535,8 @@ static ssize_t mtbf_current_show(const struct class *c, const struct class_attri
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n",
-			 pst->prop[XM_PROP_MTBF_CURRENT]);
+	return sysfs_emit(buf, "%u\n",
+			  pst->prop[XM_PROP_MTBF_CURRENT]);
 }
 static CLASS_ATTR_RW(mtbf_current);
 
@@ -2571,7 +2571,7 @@ static ssize_t fake_temp_show(const struct class *c, const struct class_attribut
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", pst->prop[XM_PROP_FAKE_TEMP]);
+	return sysfs_emit(buf, "%u\n", pst->prop[XM_PROP_FAKE_TEMP]);
 }
 static CLASS_ATTR_RW(fake_temp);
 
@@ -2587,7 +2587,7 @@ static ssize_t qbg_vbat_show(const struct class *c, const struct class_attribute
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", pst->prop[XM_PROP_QBG_VBAT]);
+	return sysfs_emit(buf, "%u\n", pst->prop[XM_PROP_QBG_VBAT]);
 }
 static CLASS_ATTR_RO(qbg_vbat);
 
@@ -2603,8 +2603,8 @@ static ssize_t vph_pwr_show(const struct class *c, const struct class_attribute 
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n",
-			 pst->prop[XM_PROP_QBG_VPH_PWR]);
+	return sysfs_emit(buf, "%d\n",
+			  pst->prop[XM_PROP_QBG_VPH_PWR]);
 }
 static CLASS_ATTR_RO(vph_pwr);
 
@@ -2620,7 +2620,7 @@ static ssize_t qbg_temp_show(const struct class *c, const struct class_attribute
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_QBG_TEMP]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_QBG_TEMP]);
 }
 static CLASS_ATTR_RO(qbg_temp);
 
@@ -2637,8 +2637,8 @@ static ssize_t typec_mode_show(const struct class *c, const struct class_attribu
 	    pst->prop[XM_PROP_TYPEC_MODE] < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%s\n",
-			 power_supply_usbc_text[pst->prop[XM_PROP_TYPEC_MODE]]);
+	return sysfs_emit(buf, "%s\n",
+			  power_supply_usbc_text[pst->prop[XM_PROP_TYPEC_MODE]]);
 }
 static CLASS_ATTR_RO(typec_mode);
 
@@ -2655,7 +2655,7 @@ static ssize_t fg1_qmax_show(const struct class *c, const struct class_attribute
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG1_QMAX]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG1_QMAX]);
 }
 static CLASS_ATTR_RO(fg1_qmax);
 
@@ -2671,7 +2671,7 @@ static ssize_t fg1_rm_show(const struct class *c, const struct class_attribute *
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG1_RM]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG1_RM]);
 }
 static CLASS_ATTR_RO(fg1_rm);
 
@@ -2687,7 +2687,7 @@ static ssize_t fg1_fcc_show(const struct class *c, const struct class_attribute 
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG1_FCC]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG1_FCC]);
 }
 static CLASS_ATTR_RO(fg1_fcc);
 
@@ -2703,7 +2703,7 @@ static ssize_t fg1_soh_show(const struct class *c, const struct class_attribute 
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG1_SOH]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG1_SOH]);
 }
 static CLASS_ATTR_RO(fg1_soh);
 
@@ -2719,8 +2719,8 @@ static ssize_t fg1_fcc_soh_show(const struct class *c, const struct class_attrib
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n",
-			 pst->prop[XM_PROP_FG1_FCC_SOH]);
+	return sysfs_emit(buf, "%d\n",
+			  pst->prop[XM_PROP_FG1_FCC_SOH]);
 }
 static CLASS_ATTR_RO(fg1_fcc_soh);
 
@@ -2736,7 +2736,7 @@ static ssize_t fg1_cycle_show(const struct class *c, const struct class_attribut
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG1_CYCLE]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG1_CYCLE]);
 }
 static CLASS_ATTR_RO(fg1_cycle);
 
@@ -2752,8 +2752,8 @@ static ssize_t fg1_fastcharge_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n",
-			 pst->prop[XM_PROP_FG1_FAST_CHARGE]);
+	return sysfs_emit(buf, "%d\n",
+			  pst->prop[XM_PROP_FG1_FAST_CHARGE]);
 }
 static CLASS_ATTR_RO(fg1_fastcharge);
 
@@ -2769,8 +2769,8 @@ static ssize_t fg1_current_max_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n",
-			 pst->prop[XM_PROP_FG1_CURRENT_MAX]);
+	return sysfs_emit(buf, "%d\n",
+			  pst->prop[XM_PROP_FG1_CURRENT_MAX]);
 }
 static CLASS_ATTR_RO(fg1_current_max);
 
@@ -2786,8 +2786,8 @@ static ssize_t fg1_vol_max_show(const struct class *c, const struct class_attrib
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n",
-			 pst->prop[XM_PROP_FG1_VOL_MAX]);
+	return sysfs_emit(buf, "%d\n",
+			  pst->prop[XM_PROP_FG1_VOL_MAX]);
 }
 static CLASS_ATTR_RO(fg1_vol_max);
 
@@ -2803,7 +2803,7 @@ static ssize_t fg1_tsim_show(const struct class *c, const struct class_attribute
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG1_TSIM]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG1_TSIM]);
 }
 static CLASS_ATTR_RO(fg1_tsim);
 
@@ -2819,8 +2819,8 @@ static ssize_t fg1_tambient_show(const struct class *c, const struct class_attri
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n",
-			 pst->prop[XM_PROP_FG1_TAMBIENT]);
+	return sysfs_emit(buf, "%d\n",
+			  pst->prop[XM_PROP_FG1_TAMBIENT]);
 }
 static CLASS_ATTR_RO(fg1_tambient);
 
@@ -2836,7 +2836,7 @@ static ssize_t fg1_tremq_show(const struct class *c, const struct class_attribut
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG1_TREMQ]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG1_TREMQ]);
 }
 static CLASS_ATTR_RO(fg1_tremq);
 
@@ -2852,7 +2852,7 @@ static ssize_t fg1_tfullq_show(const struct class *c, const struct class_attribu
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG1_TFULLQ]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG1_TFULLQ]);
 }
 static CLASS_ATTR_RO(fg1_tfullq);
 
@@ -2891,7 +2891,7 @@ static ssize_t fg1_seal_set_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", pst->prop[XM_PROP_FG1_SEAL_SET]);
+	return sysfs_emit(buf, "%u\n", pst->prop[XM_PROP_FG1_SEAL_SET]);
 }
 static CLASS_ATTR_RW(fg1_seal_set);
 
@@ -2907,7 +2907,7 @@ static ssize_t fg1_seal_state_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG1_SEAL_STATE]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG1_SEAL_STATE]);
 }
 static CLASS_ATTR_RO(fg1_seal_state);
 
@@ -2923,7 +2923,7 @@ static ssize_t fg1_df_check_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG1_DF_CHECK]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG1_DF_CHECK]);
 }
 static CLASS_ATTR_RO(fg1_df_check);
 
@@ -2939,7 +2939,7 @@ static ssize_t fg1_voltage_max_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG1_VOLTAGE_MAX]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG1_VOLTAGE_MAX]);
 }
 static CLASS_ATTR_RO(fg1_voltage_max);
 
@@ -2955,7 +2955,7 @@ static ssize_t fg1_charge_current_max_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG1_Charge_Current_MAX]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG1_Charge_Current_MAX]);
 }
 static CLASS_ATTR_RO(fg1_charge_current_max);
 
@@ -2971,7 +2971,7 @@ static ssize_t fg1_discharge_current_max_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG1_Discharge_Current_MAX]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG1_Discharge_Current_MAX]);
 }
 static CLASS_ATTR_RO(fg1_discharge_current_max);
 
@@ -2987,7 +2987,7 @@ static ssize_t fg1_temp_max_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG1_TEMP_MAX]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG1_TEMP_MAX]);
 }
 static CLASS_ATTR_RO(fg1_temp_max);
 
@@ -3003,7 +3003,7 @@ static ssize_t fg1_temp_min_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG1_TEMP_MIN]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG1_TEMP_MIN]);
 }
 static CLASS_ATTR_RO(fg1_temp_min);
 
@@ -3019,7 +3019,7 @@ static ssize_t fg1_time_ht_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG1_TIME_HT]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG1_TIME_HT]);
 }
 static CLASS_ATTR_RO(fg1_time_ht);
 
@@ -3035,7 +3035,7 @@ static ssize_t fg1_time_ot_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG1_TIME_OT]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG1_TIME_OT]);
 }
 static CLASS_ATTR_RO(fg1_time_ot);
 
@@ -3051,7 +3051,7 @@ static ssize_t fg1_time_ut_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG1_TIME_UT]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG1_TIME_UT]);
 }
 static CLASS_ATTR_RO(fg1_time_ut);
 
@@ -3067,7 +3067,7 @@ static ssize_t fg1_time_lt_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG1_TIME_LT]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG1_TIME_LT]);
 }
 static CLASS_ATTR_RO(fg1_time_lt);
 #endif
@@ -3090,7 +3090,7 @@ static ssize_t server_sn_show(const struct class *c,
 			return rc;
 		test[i] = pst->prop[XM_PROP_SERVER_SN];
 	}
-	return scnprintf(buf, PAGE_SIZE, "0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x\n", 
+	return sysfs_emit(buf, "0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x 0x%0x\n",
 		(test[0]>>24)&0xff, (test[0]>>16)&0xff, (test[0]>>8)&0xff, (test[0]>>0)&0xff,
 		(test[1]>>24)&0xff, (test[1]>>16)&0xff, (test[1]>>8)&0xff, (test[1]>>0)&0xff,
 		(test[2]>>24)&0xff, (test[2]>>16)&0xff, (test[2]>>8)&0xff, (test[2]>>0)&0xff,
@@ -3134,7 +3134,7 @@ static ssize_t server_result_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_SERVER_RESULT]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_SERVER_RESULT]);
 }
 static CLASS_ATTR_RW(server_result);
 
@@ -3150,7 +3150,7 @@ static ssize_t adsp_result_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_ADSP_RESULT]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_ADSP_RESULT]);
 }
 static CLASS_ATTR_RO(adsp_result);
 #endif
@@ -3188,7 +3188,7 @@ static ssize_t shipmode_count_reset_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", pst->prop[XM_PROP_SHIPMODE_COUNT_RESET]);
+	return sysfs_emit(buf, "%u\n", pst->prop[XM_PROP_SHIPMODE_COUNT_RESET]);
 }
 static CLASS_ATTR_RW(shipmode_count_reset);
 
@@ -3224,7 +3224,7 @@ static ssize_t sport_mode_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", pst->prop[XM_PROP_SPORT_MODE]);
+	return sysfs_emit(buf, "%u\n", pst->prop[XM_PROP_SPORT_MODE]);
 }
 static CLASS_ATTR_RW(sport_mode);
 
@@ -3240,7 +3240,7 @@ static ssize_t cell1_volt_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", pst->prop[XM_PROP_CELL1_VOLT]);
+	return sysfs_emit(buf, "%u\n", pst->prop[XM_PROP_CELL1_VOLT]);
 }
 static CLASS_ATTR_RO(cell1_volt);
 
@@ -3256,7 +3256,7 @@ static ssize_t cell2_volt_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", pst->prop[XM_PROP_CELL2_VOLT]);
+	return sysfs_emit(buf, "%u\n", pst->prop[XM_PROP_CELL2_VOLT]);
 }
 static CLASS_ATTR_RO(cell2_volt);
 
@@ -3272,7 +3272,7 @@ static ssize_t fg_vendor_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG_VENDOR_ID]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG_VENDOR_ID]);
 }
 static CLASS_ATTR_RO(fg_vendor);
 #endif
@@ -3290,7 +3290,7 @@ static ssize_t fg1_rsoc_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG1_RSOC]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG1_RSOC]);
 }
 static CLASS_ATTR_RO(fg1_rsoc);
 
@@ -3306,7 +3306,7 @@ static ssize_t fg1_ai_show(const struct class *c,
 	if (rc < 0)
 		return rc;
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n", pst->prop[XM_PROP_FG1_AI]);
+	return sysfs_emit(buf, "%d\n", pst->prop[XM_PROP_FG1_AI]);
 }
 static CLASS_ATTR_RO(fg1_ai);
 #endif
