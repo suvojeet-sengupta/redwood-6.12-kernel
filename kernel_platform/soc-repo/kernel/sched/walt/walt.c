@@ -6227,10 +6227,26 @@ static void android_vh_update_topology_flags_workfn(void *unused, void *unused2)
 	BUILD_BUG_ON(sizeof(wstruct) > (sizeof(u64) *		\
 		ARRAY_SIZE(((kstruct *)0)->android_vendor_data1)))
 
+/*
+ * sched_walt.disable=1 keeps WALT out of the scheduler. The module still
+ * loads, because ufs-qcom, qcom_lpm, bwmon, thermal_pause and
+ * msm_performance link against it, but walt_disabled stays set so its
+ * exports back off, and the kernel schedules with PELT, EAS and schedutil.
+ * thermal_pause can't park CPUs then; cpufreq cooling and LMh still work.
+ */
+static bool disable;
+module_param(disable, bool, 0444);
+MODULE_PARM_DESC(disable, "Leave scheduling to PELT, EAS and schedutil");
+
 static int walt_module_init(void)
 {
 	/* compile time checks for vendor data size */
 	WALT_VENDOR_DATA_SIZE_TEST(struct walt_task_group, struct task_group);
+
+	if (disable) {
+		pr_info("walt: disabled, scheduling with PELT and schedutil\n");
+		return 0;
+	}
 
 	register_trace_android_vh_update_topology_flags_workfn(
 			android_vh_update_topology_flags_workfn, NULL);
