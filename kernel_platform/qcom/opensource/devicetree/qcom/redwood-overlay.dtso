@@ -123,6 +123,26 @@
  * deferred; 5.4 had no such node), and the IOMMU self test is for
  * debugging only and fails to link to the GPU SMMU
  */
+/*
+ * Bluetooth audio (A2DP offload and SCO) goes to the WCN6750 over SLIMbus.
+ * yupik leaves the NGD controller off with nothing under it; lahaina has
+ * it on with the BT slave (bt_fm_slim) as below.
+ */
+&slim_msm {
+	status = "okay";
+
+	ngd@1 {
+		reg = <1>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		btfmslim_codec: btfmslim-driver {
+			compatible = "slim217,221";
+			reg = <1 0>;
+		};
+	};
+};
+
 &{/soc/qcom,cpucp_log@18509C00} {
 	status = "disabled";
 };

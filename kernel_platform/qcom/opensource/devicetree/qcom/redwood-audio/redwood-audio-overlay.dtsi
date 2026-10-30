@@ -2,7 +2,8 @@
 
 &yupik_snd {
 	qcom,tdm-max-slots = <2>;
-	qcom,wcn-bt = <1>;
+	/* 6.12's lahaina only links the SLIMBUS_7 BT DAIs for qcom,wcn-btfm */
+	qcom,wcn-btfm = <1>;
 	qcom,mi2s-audio-intf = <1>;
 	qcom,auxpcm-audio-intf = <0>;
 	qcom,ext-disp-audio-rx = <0>;
