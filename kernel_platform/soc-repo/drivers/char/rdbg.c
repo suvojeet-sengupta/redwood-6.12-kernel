@@ -1013,7 +1013,8 @@ static int register_smp2p_out(struct device *dev, char *node_name,
 				    qcom_smem_state_get(dev, "rdbg-smp2p-out",
 						&gpio_info_ptr->smem_bit);
 			if (IS_ERR_OR_NULL(gpio_info_ptr->smem_state)) {
-				pr_err("rdbg: failed get smem state\n");
+				if (PTR_ERR(gpio_info_ptr->smem_state) != -EPROBE_DEFER)
+					pr_err("rdbg: failed get smem state\n");
 				return PTR_ERR(gpio_info_ptr->smem_state);
 			}
 		}
@@ -1065,8 +1066,9 @@ static int rdbg_probe(struct platform_device *pdev)
 			err = register_smp2p_out(dev, node_name,
 			&rdbgdevice->rdbg_data[minor].out);
 			if (err) {
-				pr_err("%s: register_smp2p_out failed for %s\n",
-				__func__, proc_info[minor].name);
+				if (err != -EPROBE_DEFER)
+					pr_err("%s: register_smp2p_out failed for %s\n",
+					__func__, proc_info[minor].name);
 				goto bail;
 			}
 		}
@@ -1194,6 +1196,8 @@ bail:
 	return err;
 }
 module_init(rdbg_init);
+/* the smp2p states it needs come from smp2p; load that first */
+MODULE_SOFTDEP("pre: smp2p");
 
 static void __exit rdbg_exit(void)
 {
