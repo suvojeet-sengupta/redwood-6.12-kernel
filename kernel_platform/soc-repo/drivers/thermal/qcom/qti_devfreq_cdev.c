@@ -90,7 +90,7 @@ static int devfreq_cdev_probe(struct platform_device *pdev)
 	int ret = 0, freq_ct, i;
 	struct devfreq_cdev_device *devfreq_cdev;
 	struct platform_device *gpu_pdev;
-	struct device_link *link;
+	bool bound;
 
 	devfreq_cdev = devm_kzalloc(dev, sizeof(*devfreq_cdev), GFP_KERNEL);
 	if (!devfreq_cdev)
@@ -111,23 +111,20 @@ static int devfreq_cdev_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	link = device_link_add(devfreq_cdev->dev, &gpu_pdev->dev,
-		DL_FLAG_AUTOPROBE_CONSUMER);
+	/*
+	 * Wait for kgsl to probe. This used to add a managed device link just
+	 * to read its state and then delete it, which 6.12 warns about since
+	 * managed links can't be deleted by hand.
+	 */
+	bound = device_is_bound(&gpu_pdev->dev);
 
 	put_device(&gpu_pdev->dev);
 	of_node_put(devfreq_cdev->gpu_np);
 
-	if (!link) {
-		dev_err(devfreq_cdev->dev, "add gpu device_link fail\n");
-		return -ENODEV;
-	}
-	if (link->status == DL_STATE_DORMANT) {
-		dev_dbg(devfreq_cdev->dev, "kgsl not probed yet:%d\n", ret);
-		device_link_del(link);
+	if (!bound) {
+		dev_dbg(devfreq_cdev->dev, "kgsl not probed yet\n");
 		return -EPROBE_DEFER;
 	}
-
-	device_link_del(link);
 
 	devfreq_cdev->gpu_dev = &gpu_pdev->dev;
 	freq_ct = dev_pm_opp_get_opp_count(devfreq_cdev->gpu_dev);
