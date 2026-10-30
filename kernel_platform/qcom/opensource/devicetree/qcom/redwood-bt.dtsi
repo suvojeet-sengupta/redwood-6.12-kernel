@@ -10,9 +10,9 @@
 		compatible = "qcom,wcn6750-bt";
 		pinctrl-names = "default";
 		pinctrl-0 = <&bt_en_sleep>;
-		qcom,bt-reset-gpio = <&tlmm 85 0>;
-		qcom,bt-sw-ctrl-gpio = <&tlmm 86 0>;
-		qcom,wl-reset-gpio = <&tlmm 84 0>;
+		qcom,bt-reset-gpios = <&tlmm 85 0>;
+		qcom,bt-sw-ctrl-gpios = <&tlmm 86 0>;
+		qcom,wl-reset-gpios = <&tlmm 84 0>;
 
 		qcom,bt-vdd-io-supply = <&L19B>;
 		qcom,bt-vdd-aon-supply = <&S7B>;

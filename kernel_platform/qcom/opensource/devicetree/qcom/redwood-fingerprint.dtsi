@@ -8,8 +8,8 @@
 &soc {
 	fingerprint_goodix {
 		compatible = "goodix,fingerprint";
-		goodix,gpio-irq = <&tlmm 34 0>;
-		goodix,gpio-reset = <&tlmm 43 0>;
+		irq-gpios = <&tlmm 34 0>;
+		reset-gpios = <&tlmm 43 0>;
 		l3c_vdd-supply = <&L3C>;
 		status = "okay";
 	};

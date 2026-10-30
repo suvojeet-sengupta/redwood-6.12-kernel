@@ -60,8 +60,8 @@
 	aw8697_haptic@5A {
 		compatible = "awinic,awinic_haptic";
 		reg = <0x5a>;
-		reset-gpio = <&tlmm 35 0x00>;
-		irq-gpio = <&tlmm 18 0x00>;
+		reset-gpios = <&tlmm 35 0x00>;
+		irq-gpios = <&tlmm 18 0x00>;
 		pinctrl-names = "awinic_reset_reset","awinic_reset_active","awinic_interrupt_active";
 		pinctrl-0 = <&awinic_gpio_reset>;
 		pinctrl-1 = <&awinic_gpio_reset_output_high>;
