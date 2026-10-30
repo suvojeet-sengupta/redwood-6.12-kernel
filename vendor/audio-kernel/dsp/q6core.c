@@ -655,7 +655,7 @@ int q6core_get_service_version(uint32_t service_id,
 	cached_ver_info = q6core_lcl.q6core_avcs_ver_info.ver_info;
 	num_services = cached_ver_info->avcs_fwk_version.num_services;
 
-	pr_err("%s num_services = %d ",__func__, num_services);
+	pr_debug("%s num_services = %d\n", __func__, num_services);
 	if (service_id == AVCS_SERVICE_ID_ALL) {
 		memcpy(ver_info, cached_ver_info, ver_size);
 		return 0;
@@ -753,7 +753,7 @@ int q6core_get_avcs_api_version_per_service(uint32_t service_id)
 	uint32_t num_services;
 	int ret = 0;
 
-	pr_err("%s Entered for service_id = %u\n",__func__, service_id );
+	pr_debug("%s Entered for service_id = %u\n", __func__, service_id);
 	if (service_id == AVCS_SERVICE_ID_ALL)
 		return -EINVAL;
 
@@ -769,7 +769,7 @@ int q6core_get_avcs_api_version_per_service(uint32_t service_id)
 		return -EINVAL;
 	}
 	num_services = cached_ver_info->avcs_fwk_version.num_services;
-	pr_err("%s num_services = 0x%x  ",__func__, num_services);
+	pr_debug("%s num_services = 0x%x\n", __func__, num_services);
 	if (num_services > VSS_MAX_AVCS_NUM_SERVICES) {
                 pr_err("%s: num_services: %d greater than max services: %d\n",
                        __func__, num_services, VSS_MAX_AVCS_NUM_SERVICES);
@@ -777,7 +777,7 @@ int q6core_get_avcs_api_version_per_service(uint32_t service_id)
 
 	for (i = 0; i < num_services; i++) {
 		if (cached_ver_info->services[i].service_id == service_id) {
-			pr_err("%s cached_ver_info->services[i].api_version = 0x%x \n",__func__,
+			pr_debug("%s cached_ver_info->services[i].api_version = 0x%x\n", __func__,
 				cached_ver_info->services[i].api_version);
 			return cached_ver_info->services[i].api_version;
 		}
