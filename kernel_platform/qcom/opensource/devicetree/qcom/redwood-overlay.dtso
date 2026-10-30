@@ -253,6 +253,16 @@
 };
 
 /*
+ * Keep the cluster out of its deepest state, LLCC off (cluster-sleep-2,
+ * AOSS sleep with CX collapsed). With power collapse on, the phone reset
+ * through PS_HOLD every one to six minutes on the fast charger; the two
+ * shallower cluster states and every CPU state stay.
+ */
+&CLUSTER_PD {
+	domain-idle-states = <&CLUSTER_SLEEP_APSS_OFF &CLUSTER_SLEEP_CX_RET>;
+};
+
+/*
  * redwood has no motor on the PMIC LDO vibrator output: the vibrator is the
  * AW86927 (redwood-haptics.dtsi). With this node probed it takes
  * /sys/class/leds/vibrator, the vibrator HAL drives it and nothing buzzes.
