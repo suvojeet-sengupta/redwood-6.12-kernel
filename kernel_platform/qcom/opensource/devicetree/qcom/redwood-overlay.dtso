@@ -110,6 +110,16 @@
 	status = "disabled";
 };
 
+/*
+ * No serial console: the 6.12 GKI driver makes the debug UART a console,
+ * and at 115200 baud each kernel warning took ~650 ms to print with the
+ * console lock held, long enough to drop display frames and time out the
+ * touch SPI transfers. pstore still keeps the console log.
+ */
+&qupv3_se5_2uart {
+	status = "disabled";
+};
+
 /* The display RSC finds its RPMh controller through this */
 &disp_rsc_drv0 {
 	sde_rsc_rpmh {
