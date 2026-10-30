@@ -48,15 +48,17 @@
 };
 
 /*
- * Keep the console log where the 5.4 kernel keeps it, so a 6.12 boot that
- * goes wrong can still be read from /sys/fs/pstore after booting 5.4.
+ * Keep pstore in the region the 5.4 kernel uses. Without a record size
+ * ramoops saves no oops or panic dumps, only the console and pmsg, so give
+ * dumps half of it: 8 records of 256K, then 1M each for console and pmsg.
  */
 &reserved_memory {
 	ramoops@b0000000 {
 		compatible = "ramoops";
 		reg = <0x0 0xb0000000 0x0 0x400000>;
-		console-size = <0x200000>;
-		pmsg-size = <0x200000>;
+		record-size = <0x40000>;
+		console-size = <0x100000>;
+		pmsg-size = <0x100000>;
 		mem-type = <2>;
 	};
 };
