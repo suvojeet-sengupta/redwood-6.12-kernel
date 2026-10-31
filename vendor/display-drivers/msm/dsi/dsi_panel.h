@@ -11,6 +11,7 @@
 #include <linux/types.h>
 #include <linux/bitops.h>
 #include <linux/errno.h>
+#include <linux/gpio/consumer.h>
 #include <linux/backlight.h>
 #include <linux/i2c.h>
 #include <drm/drm_panel.h>
@@ -159,7 +160,7 @@ struct dsi_backlight_config {
 	u32 dimming_status;
 	bool user_disable_notification;
 
-	int en_gpio;
+	struct gpio_desc *en_gpio;
 	/* PWM params */
 	struct pwm_device *pwm_bl;
 	bool pwm_enabled;
@@ -182,10 +183,11 @@ struct dsi_panel_reset_config {
 	struct dsi_reset_seq *sequence;
 	u32 count;
 
-	int reset_gpio;
-	int disp_en_gpio;
-	int oled_en_gpio;
-	int lcd_mode_sel_gpio;
+	struct gpio_desc *reset_gpio;
+	struct gpio_desc *disp_en_gpio;
+	struct gpio_desc *oled_en_gpio;
+	struct gpio_desc *lcd_mode_sel_gpio;
+	bool has_reset_gpio;
 	u32 mode_sel_state;
 	u32 gpio_release_delay_ms;
 };
@@ -437,7 +439,8 @@ struct dsi_panel {
 
 	bool ctl_op_sync;
 
-	int panel_test_gpio;
+	struct gpio_desc *panel_test_gpio;
+	bool gpios_held;
 	int power_mode;
 	bool powered;
 	enum dsi_panel_physical_type panel_type;
