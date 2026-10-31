@@ -1541,7 +1541,13 @@ static unsigned int __maybe_unused sysctl_sched_uclamp_util_max = SCHED_CAPACITY
  * This knob will not override the system default sched_util_clamp_min defined
  * above.
  */
-unsigned int sysctl_sched_uclamp_util_min_rt_default = SCHED_CAPACITY_SCALE;
+/*
+ * redwood: leave RT tasks to schedutil like CFS ones. SurfaceFlinger, the
+ * composer and input threads are RT and run every frame; clamped to 1024
+ * they held the big cores at their top frequency with the screen just
+ * showing a static app.
+ */
+unsigned int sysctl_sched_uclamp_util_min_rt_default;
 
 /* All clamps are required to be less or equal than these values */
 static struct uclamp_se uclamp_default[UCLAMP_CNT];
