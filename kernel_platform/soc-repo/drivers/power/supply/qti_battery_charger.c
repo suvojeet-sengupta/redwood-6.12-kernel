@@ -1349,9 +1349,6 @@ static int battery_psy_set_charge_current(struct battery_chg_dev *bcdev,
 	if (val < 0 || val >= bcdev->num_thermal_levels)
 		return -EINVAL;
 
-	if (val == bcdev->curr_thermal_level)
-		return 0;
-
 	/*
 	 * Xiaomi's charger firmware takes the thermal level itself in
 	 * BATT_CHG_CTRL_LIM and looks the current up in its own table, as the
