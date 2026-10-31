@@ -17,6 +17,9 @@
 #include <linux/of_platform.h>
 #include <linux/delay.h>
 #include <linux/time64.h>
+#include <linux/sched/signal.h>
+#include <linux/sched/task.h>
+#include <uapi/linux/sched/types.h>
 
 #include <trace/hooks/sched.h>
 #include <trace/hooks/cpufreq.h>
@@ -6238,6 +6241,61 @@ static bool disable;
 module_param(disable, bool, 0444);
 MODULE_PARM_DESC(disable, "Leave scheduling to PELT, EAS and schedutil");
 
+/*
+ * redwood: RCU's grace period and offloaded callback kthreads are RT, and
+ * with uclamp's RT default schedutil runs every CPU they wake on at its top
+ * frequency. They wake every tick while a grace period runs, which held the
+ * idle prime core at 2.4 GHz half the time with the screen off. None of them
+ * is latency critical, so with PELT move them to the silver cluster, the
+ * first cpufreq policy, and drop their uclamp.min, so schedutil sets the
+ * frequency from their load. Display, GPU and audio RT threads keep the RT
+ * default. Done once boot is over, when cpufreq is surely up.
+ */
+#define WALT_RCU_PELT_DELAY	(60 * HZ)
+
+static void walt_rcu_pelt_workfn(struct work_struct *work)
+{
+	struct cpufreq_policy *policy = cpufreq_cpu_get(0);
+	struct task_struct *g, *p, *tasks[64];
+	int n = 0, i;
+
+	if (!policy) {
+		schedule_delayed_work(to_delayed_work(work), WALT_RCU_PELT_DELAY);
+		return;
+	}
+
+	rcu_read_lock();
+	for_each_process_thread(g, p) {
+		if (!(p->flags & PF_KTHREAD) || strncmp(p->comm, "rcu", 3))
+			continue;
+		if (n == ARRAY_SIZE(tasks))
+			break;
+		get_task_struct(p);
+		tasks[n++] = p;
+	}
+	rcu_read_unlock();
+
+	for (i = 0; i < n; i++) {
+		p = tasks[i];
+		set_cpus_allowed_ptr(p, policy->related_cpus);
+		if (rt_task(p)) {
+			struct sched_attr attr = {
+				.size = sizeof(attr),
+				.sched_flags = SCHED_FLAG_KEEP_ALL |
+					       SCHED_FLAG_UTIL_CLAMP_MIN,
+				.sched_util_min = 0,
+			};
+
+			sched_setattr_nocheck(p, &attr);
+		}
+		put_task_struct(p);
+	}
+	cpufreq_cpu_put(policy);
+	pr_info("walt: moved %d RCU kthreads to CPUs %*pbl\n", n,
+		cpumask_pr_args(policy->related_cpus));
+}
+static DECLARE_DELAYED_WORK(walt_rcu_pelt_work, walt_rcu_pelt_workfn);
+
 static int walt_module_init(void)
 {
 	/* compile time checks for vendor data size */
@@ -6245,6 +6303,7 @@ static int walt_module_init(void)
 
 	if (disable) {
 		pr_info("walt: disabled, scheduling with PELT and schedutil\n");
+		schedule_delayed_work(&walt_rcu_pelt_work, WALT_RCU_PELT_DELAY);
 		return 0;
 	}
 
