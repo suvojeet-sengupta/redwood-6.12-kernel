@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Landlock LSM - Network management and hooks
+ * Landlock - Network management and hooks
  *
  * Copyright © 2022-2023 Huawei Tech. Co., Ltd.
- * Copyright © 2022-2023 Microsoft Corporation
+ * Copyright © 2022-2025 Microsoft Corporation
  */
 
 #include <linux/in.h>
@@ -39,29 +39,26 @@ int landlock_append_net_rule(struct landlock_ruleset *const ruleset,
 	return err;
 }
 
-static const struct access_masks any_net = {
-	.net = ~0,
-};
-
 static int current_check_access_socket(struct socket *const sock,
 				       struct sockaddr *const address,
 				       const int addrlen,
 				       access_mask_t access_request)
 {
+	unsigned short sock_family;
 	__be16 port;
 	layer_mask_t layer_masks[LANDLOCK_NUM_ACCESS_NET] = {};
 	const struct landlock_rule *rule;
 	struct landlock_id id = {
 		.type = LANDLOCK_KEY_NET_PORT,
 	};
-	const struct landlock_ruleset *const dom =
-		landlock_get_applicable_domain(landlock_get_current_domain(),
-					       any_net);
+	const struct access_masks masks = {
+		.net = access_request,
+	};
+	const struct landlock_cred_security *const subject =
+		landlock_get_applicable_subject(current_cred(), masks, NULL);
 
-	if (!dom)
+	if (!subject)
 		return 0;
-	if (WARN_ON_ONCE(dom->num_layers < 1))
-		return -EACCES;
 
 	if (!sk_is_tcp(sock->sk))
 		return 0;
@@ -69,6 +66,12 @@ static int current_check_access_socket(struct socket *const sock,
 	/* Checks for minimal header length to safely read sa_family. */
 	if (addrlen < offsetofend(typeof(*address), sa_family))
 		return -EINVAL;
+
+	/*
+	 * The socket is not locked, so sk_family can change concurrently due to
+	 * e.g. setsockopt(IPV6_ADDRFORM).
+	 */
+	sock_family = READ_ONCE(sock->sk->sk_family);
 
 	switch (address->sa_family) {
 	case AF_UNSPEC:
@@ -106,7 +109,7 @@ static int current_check_access_socket(struct socket *const sock,
 			 * these checks, but it is safer to return a proper
 			 * error and test consistency thanks to kselftest.
 			 */
-			if (sock->sk->__sk_common.skc_family == AF_INET) {
+			if (sock_family == AF_INET) {
 				const struct sockaddr_in *const sockaddr =
 					(struct sockaddr_in *)address;
 
@@ -154,16 +157,17 @@ static int current_check_access_socket(struct socket *const sock,
 	 * check, but it is safer to return a proper error and test
 	 * consistency thanks to kselftest.
 	 */
-	if (address->sa_family != sock->sk->__sk_common.skc_family &&
+	if (address->sa_family != sock_family &&
 	    address->sa_family != AF_UNSPEC)
 		return -EINVAL;
 
 	id.key.data = (__force uintptr_t)port;
 	BUILD_BUG_ON(sizeof(port) > sizeof(id.key.data));
 
-	rule = landlock_find_rule(dom, id);
-	access_request = landlock_init_layer_masks(
-		dom, access_request, &layer_masks, LANDLOCK_KEY_NET_PORT);
+	rule = landlock_find_rule(subject->domain, id);
+	access_request = landlock_init_layer_masks(subject->domain,
+						   access_request, &layer_masks,
+						   LANDLOCK_KEY_NET_PORT);
 	if (landlock_unmask_layers(rule, access_request, &layer_masks,
 				   ARRAY_SIZE(layer_masks)))
 		return 0;
