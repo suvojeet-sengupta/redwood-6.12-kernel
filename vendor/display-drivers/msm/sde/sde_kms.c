@@ -6730,7 +6730,7 @@ static int _sde_kms_hw_init_power_helper(struct drm_device *dev,
 {
 	int rc = 0;
 
-	if (of_find_property(dev->dev->of_node, "#power-domain-cells", NULL)) {
+	if (of_property_present(dev->dev->of_node, "#power-domain-cells")) {
 		sde_kms->genpd.name = dev->unique;
 		sde_kms->genpd.power_off = sde_kms_pd_disable;
 		sde_kms->genpd.power_on = sde_kms_pd_enable;

@@ -4861,7 +4861,7 @@ static ssize_t panel_power_state_show(struct device *device,
 
 	SDE_DEBUG("conn %d - dpms %d, lp %d, panel %d\n", conn->base.id,
 			sde_conn->dpms_mode, sde_conn->lp_mode, mode);
-	return scnprintf(buf, PAGE_SIZE, "%d\n", mode);
+	return sysfs_emit(buf, "%d\n", mode);
 }
 
 static ssize_t twm_enable_store(struct device *device,
@@ -4899,7 +4899,7 @@ static ssize_t twm_enable_show(struct device *device,
 	sde_conn = to_sde_connector(conn);
 
 	SDE_DEBUG("TWM: %s\n", sde_conn->twm_en ? "ENABLED" : "DISABLED");
-	return scnprintf(buf, PAGE_SIZE, "%d\n", sde_conn->twm_en);
+	return sysfs_emit(buf, "%d\n", sde_conn->twm_en);
 }
 
 static ssize_t offload_enable_store(struct device *device,
@@ -4978,7 +4978,7 @@ static ssize_t offload_enable_show(struct device *device,
 	sde_conn = to_sde_connector(conn);
 
 	SDE_DEBUG("OFFLOAD: %s\n", sde_conn->offload_en ? "ENABLED" : "DISABLED");
-	return scnprintf(buf, PAGE_SIZE, "%d\n", sde_conn->offload_en);
+	return sysfs_emit(buf, "%d\n", sde_conn->offload_en);
 }
 
 static ssize_t skip_panel_power_store(struct device *device,
@@ -5017,7 +5017,7 @@ static ssize_t skip_panel_power_show(struct device *device,
 
 	SDE_DEBUG("skip panel power: %s\n",
 			sde_conn->skip_panel_power ? "ENABLED" : "DISABLED");
-	return scnprintf(buf, PAGE_SIZE, "%d\n", sde_conn->skip_panel_power);
+	return sysfs_emit(buf, "%d\n", sde_conn->skip_panel_power);
 }
 
 static DEVICE_ATTR_RO(panel_power_state);
