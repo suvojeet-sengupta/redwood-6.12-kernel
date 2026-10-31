@@ -541,6 +541,7 @@ static ssize_t authentic_store(const struct class *c, const struct class_attribu
 	if (kstrtobool(buf, &val))
 		return -EINVAL;
 
+	bcdev->battery_auth = val;
 	pr_err("authentic_store: %d\n", val);
 	rc = write_property_id(bcdev, &bcdev->psy_list[PSY_TYPE_XM],
 			       XM_PROP_AUTHENTIC, val);

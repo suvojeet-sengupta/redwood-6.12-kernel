@@ -623,6 +623,8 @@ struct battery_chg_dev {
 	u32				*ss_auth_data;
 	int				curr_wlsthermal_level;
 	int				blank_state;
+	/* battery authentication result, sent again after a restart */
+	bool				battery_auth;
 	u32				reverse_chg_flag;
 	u32				hw_version_build;
 	bool				shutdown_delay_en;
