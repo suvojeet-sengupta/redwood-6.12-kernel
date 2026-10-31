@@ -17,6 +17,9 @@
 #include <linux/of_platform.h>
 #include <linux/delay.h>
 #include <linux/time64.h>
+#include <linux/sched/signal.h>
+#include <linux/sched/task.h>
+#include <uapi/linux/sched/types.h>
 
 #include <trace/hooks/sched.h>
 #include <trace/hooks/cpufreq.h>
@@ -6151,6 +6154,49 @@ static void walt_init_tg_pointers(void)
 	rcu_read_unlock();
 }
 
+/*
+ * redwood: RCU's grace period and offloaded callback kthreads are RT, so
+ * with uclamp's RT default each wakeup takes its CPU to the top frequency.
+ * They wake every tick while a grace period runs, which left free held the
+ * idle gold and prime cores at up to 2.4 GHz. None of them is latency
+ * critical: keep them on the lowest capacity cluster and drop their
+ * uclamp.min, so WALT sets the frequency from their load. Other RT threads,
+ * such as the display, GPU and audio ones, keep the RT default.
+ */
+static void walt_rcu_kthreads_to_min_cluster(void)
+{
+	const struct cpumask *mask = &sched_cluster[0]->cpus;
+	struct task_struct *g, *p, *tasks[64];
+	int n = 0, i;
+
+	rcu_read_lock();
+	for_each_process_thread(g, p) {
+		if (!(p->flags & PF_KTHREAD) || strncmp(p->comm, "rcu", 3))
+			continue;
+		if (n == ARRAY_SIZE(tasks))
+			break;
+		get_task_struct(p);
+		tasks[n++] = p;
+	}
+	rcu_read_unlock();
+
+	for (i = 0; i < n; i++) {
+		p = tasks[i];
+		set_cpus_allowed_ptr(p, mask);
+		if (rt_task(p)) {
+			struct sched_attr attr = {
+				.size = sizeof(attr),
+				.sched_flags = SCHED_FLAG_KEEP_ALL |
+					       SCHED_FLAG_UTIL_CLAMP_MIN,
+				.sched_util_min = 0,
+			};
+
+			sched_setattr_nocheck(p, &attr);
+		}
+		put_task_struct(p);
+	}
+}
+
 static void walt_init(struct work_struct *work)
 {
 	static atomic_t already_inited = ATOMIC_INIT(0);
@@ -6215,6 +6261,7 @@ static void walt_init(struct work_struct *work)
 	topology_clear_scale_freq_source(SCALE_FREQ_SOURCE_ARCH, cpu_online_mask);
 
 	walt_stats_sysctl_init();
+	walt_rcu_kthreads_to_min_cluster();
 }
 
 static DECLARE_WORK(walt_init_work, walt_init);
