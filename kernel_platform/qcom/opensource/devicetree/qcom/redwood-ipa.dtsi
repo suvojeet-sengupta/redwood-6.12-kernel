@@ -79,13 +79,9 @@
 		qcom,eth-bridging-not-supported;
 		qcom,bw-monitor-supported;
 		qcom,lan-rx-napi;
-		/*
-		 * No qcom,tx-napi: on 6.12 the TX NAPI never ran, so
-		 * rmnet_ipa0 stopped for good after its first 256 uplink
-		 * packets ("data stall in UL, 256 outstanding") and mobile
-		 * data died as soon as it carried real traffic. The tasklet
-		 * completion path works.
-		 */
+		qcom,tx-napi;
+		/* downlink pages go to the stack without a copy */
+		qcom,wan-use-skb-page;
 		qcom,rmnet-ctl-enable;
 		qcom,use-gsi-ipa-fw = "yupik_ipa_fws";
 		qcom,tx-wrapper-cache-max-size = <400>;
