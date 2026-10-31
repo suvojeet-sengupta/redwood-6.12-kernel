@@ -2097,7 +2097,6 @@ static struct drm_driver msm_driver = {
 	.patchlevel         = MSM_VERSION_PATCHLEVEL,
 };
 
-#if IS_ENABLED(CONFIG_PM_SLEEP)
 static int msm_pm_suspend(struct device *dev)
 {
 	struct drm_device *ddev;
@@ -2147,7 +2146,6 @@ static int msm_pm_resume(struct device *dev)
 
 	return 0;
 }
-#endif /* CONFIG_PM_SLEEP */
 
 #if IS_ENABLED(CONFIG_HIBERNATE)
 static int msm_pm_freeze(struct device *dev)
@@ -2195,7 +2193,6 @@ static int msm_pm_restore(struct device *dev)
 }
 #endif /* CONFIG_HIBERNATE */
 
-#if IS_ENABLED(CONFIG_PM)
 static int msm_runtime_suspend(struct device *dev)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
@@ -2236,18 +2233,15 @@ static int msm_runtime_resume(struct device *dev)
 
 	return ret;
 }
-#endif /* CONFIG_PM */
 
 static const struct dev_pm_ops msm_pm_ops = {
-#ifdef CONFIG_PM_SLEEP
-	.suspend = msm_pm_suspend,
-	.resume = msm_pm_resume,
-#endif /* CONFIG_PM_SLEEP */
+	.suspend = pm_sleep_ptr(msm_pm_suspend),
+	.resume = pm_sleep_ptr(msm_pm_resume),
 #if IS_ENABLED(CONFIG_HIBERNATE)
 	.freeze = msm_pm_freeze,
 	.restore = msm_pm_restore,
 #endif /* CONFIG_HIBERNATE */
-	SET_RUNTIME_PM_OPS(msm_runtime_suspend, msm_runtime_resume, NULL)
+	RUNTIME_PM_OPS(msm_runtime_suspend, msm_runtime_resume, NULL)
 };
 
 /*
@@ -2680,7 +2674,7 @@ static struct platform_driver msm_platform_driver = {
 	.driver     = {
 		.name   = "msm_drm",
 		.of_match_table = dt_match,
-		.pm     = &msm_pm_ops,
+		.pm     = pm_ptr(&msm_pm_ops),
 		.suppress_bind_attrs = true,
 	},
 };

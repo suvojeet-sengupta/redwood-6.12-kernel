@@ -63,7 +63,7 @@ struct sde_cdev *backlight_cdev_register(struct device *dev,
 
 	if (!dev || !bd || !n)
 		return ERR_PTR(-EINVAL);
-	if (!of_find_property(dev->of_node, "#cooling-cells", NULL))
+	if (!of_property_present(dev->of_node, "#cooling-cells"))
 		return ERR_PTR(-ENODEV);
 
 	disp_cdev = devm_kzalloc(dev, sizeof(*disp_cdev), GFP_KERNEL);

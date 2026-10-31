@@ -891,7 +891,7 @@ static ssize_t fps_periodicity_ms_show(struct device *device,
 
 	sde_crtc = to_sde_crtc(crtc);
 
-	return scnprintf(buf, PAGE_SIZE, "%d\n",
+	return sysfs_emit(buf, "%d\n",
 		(sde_crtc->fps_info.fps_periodic_duration)/MILI_TO_MICRO);
 }
 
@@ -913,14 +913,14 @@ static ssize_t measured_fps_show(struct device *device,
 
 	crtc = dev_get_drvdata(device);
 	if (!crtc) {
-		scnprintf(buf, PAGE_SIZE, "fps information not available");
+		sysfs_emit(buf, "fps information not available");
 		return -EINVAL;
 	}
 
 	sde_crtc = to_sde_crtc(crtc);
 
 	if (!sde_crtc->fps_info.time_buf) {
-		scnprintf(buf, PAGE_SIZE,
+		sysfs_emit(buf,
 				"timebuf null - fps information not available");
 		return -EINVAL;
 	}
@@ -979,7 +979,7 @@ static ssize_t measured_fps_show(struct device *device,
 
 	fps_int = (uint64_t) sde_crtc->fps_info.measured_fps;
 	fps_decimal = do_div(fps_int, 10);
-	return scnprintf(buf, PAGE_SIZE,
+	return sysfs_emit(buf,
 	"fps: %lld.%lld duration:%d frame_count:%lld\n", fps_int, fps_decimal,
 			sde_crtc->fps_info.fps_periodic_duration, frame_count);
 }
@@ -1012,7 +1012,7 @@ static ssize_t vsync_event_show(struct device *device,
 	}
 	mutex_unlock(&sde_crtc->crtc_lock);
 
-	return scnprintf(buf, PAGE_SIZE, "VSYNC=%llu\nAVR_STATUS=%d\n",
+	return sysfs_emit(buf, "VSYNC=%llu\nAVR_STATUS=%d\n",
 			ktime_to_ns(sde_crtc->vblank_last_cb_time), avr_status);
 }
 
@@ -1029,7 +1029,7 @@ static ssize_t retire_frame_event_show(struct device *device,
 
 	crtc = dev_get_drvdata(device);
 	sde_crtc = to_sde_crtc(crtc);
-	return scnprintf(buf, PAGE_SIZE, "RETIRE_FRAME_TIME=%llu\n",
+	return sysfs_emit(buf, "RETIRE_FRAME_TIME=%llu\n",
 			ktime_to_ns(sde_crtc->retire_frame_event_time));
 }
 
