@@ -6,10 +6,8 @@
 
 #include <linux/delay.h>
 #include <linux/slab.h>
-#include <linux/gpio.h>
 #include <linux/i2c.h>
 #include <linux/of.h>
-#include <linux/of_gpio.h>
 #include <linux/pinctrl/consumer.h>
 #include <linux/pwm.h>
 #include <video/mipi_display.h>
@@ -159,117 +157,168 @@ static int dsi_panel_post_vreg_get(struct dsi_panel *panel)
 	return rc;
 }
 
-static int dsi_panel_gpio_request(struct dsi_panel *panel)
+/*
+ * Panel GPIOs are looked up as descriptors through the panel's device tree
+ * node. The properties keep their "-gpio" names; gpiolib adds that suffix to
+ * the connection id itself. Panels described by the DSI firmware parser have
+ * no GPIOs: it only knew global GPIO numbers, which mean nothing any more.
+ */
+static struct gpio_desc *dsi_panel_gpiod_get(struct dsi_panel *panel,
+		const char *prop, enum gpiod_flags flags, const char *label)
 {
-	int rc = 0;
-	struct dsi_panel_reset_config *r_config = &panel->reset_config;
+	struct gpio_desc *desc;
+	char con_id[64];
+	size_t len;
 
-	if (panel->ctl_op_sync && !strcmp(panel->type, "secondary"))
-		return 0;
+	if (panel->utils.get_property != of_get_property ||
+	    !panel->panel_of_node)
+		return NULL;
 
-	if (gpio_is_valid(r_config->reset_gpio)) {
-		rc = gpio_request(r_config->reset_gpio, "reset_gpio");
-		if (rc) {
-			DSI_ERR("request for reset_gpio failed, rc=%d\n", rc);
-			goto error;
-		}
-	}
+	len = strlen(prop);
+	if (len > 5 && !strcmp(prop + len - 5, "-gpio"))
+		len -= 5;
+	if (len >= sizeof(con_id))
+		return ERR_PTR(-EINVAL);
+	memcpy(con_id, prop, len);
+	con_id[len] = '\0';
 
-	if (gpio_is_valid(r_config->disp_en_gpio)) {
-		rc = gpio_request(r_config->disp_en_gpio, "disp_en_gpio");
-		if (rc) {
-			DSI_ERR("request for disp_en_gpio failed, rc=%d\n", rc);
-			goto error_release_reset;
-		}
-	}
+	desc = fwnode_gpiod_get_index(of_fwnode_handle(panel->panel_of_node),
+				      con_id, 0, flags, label);
+	if (PTR_ERR(desc) == -ENOENT)
+		return NULL;
+	return desc;
+}
 
-	if (panel->need_post_on_supply) {
-		if (gpio_is_valid(r_config->oled_en_gpio)) {
-			rc = gpio_request_one(r_config->oled_en_gpio, GPIOF_IN, "oled_en_gpio");
-			if (rc) {
-				DSI_ERR("request for oled_en_gpio failed, rc=%d\n", rc);
-				goto error_release_disp_en;
-			}
-		}
-	}
+static bool dsi_panel_is_primary(struct dsi_panel *panel)
+{
+	return !strcmp(panel->type, "primary");
+}
 
-	if (gpio_is_valid(panel->bl_config.en_gpio)) {
-		rc = gpio_request(panel->bl_config.en_gpio, "bklt_en_gpio");
-		if (rc) {
-			DSI_ERR("request for bklt_en_gpio failed, rc=%d\n", rc);
-			goto error_release_oled_en;
-		}
-	}
+static const char *dsi_panel_reset_gpio_name(struct dsi_panel *panel)
+{
+	return dsi_panel_is_primary(panel) ? "qcom,platform-reset-gpio" :
+					     "qcom,platform-sec-reset-gpio";
+}
 
-	if (gpio_is_valid(r_config->lcd_mode_sel_gpio)) {
-		rc = gpio_request(r_config->lcd_mode_sel_gpio, "mode_gpio");
-		if (rc) {
-			DSI_ERR("request for mode_gpio failed, rc=%d\n", rc);
-			goto error_release_mode_sel;
-		}
-	}
-
-	if (gpio_is_valid(panel->panel_test_gpio)) {
-		rc = gpio_request(panel->panel_test_gpio, "panel_test_gpio");
-		if (rc) {
-			DSI_WARN("request for panel_test_gpio failed, rc=%d\n",
-				 rc);
-			panel->panel_test_gpio = -1;
-			rc = 0;
-		}
-	}
-
-	goto error;
-error_release_mode_sel:
-	if (gpio_is_valid(panel->bl_config.en_gpio))
-		gpio_free(panel->bl_config.en_gpio);
-error_release_oled_en:
-	if (panel->need_post_on_supply && gpio_is_valid(r_config->oled_en_gpio))
-		gpio_free(r_config->oled_en_gpio);
-error_release_disp_en:
-	if (gpio_is_valid(r_config->disp_en_gpio))
-		gpio_free(r_config->disp_en_gpio);
-error_release_reset:
-	if (gpio_is_valid(r_config->reset_gpio))
-		gpio_free(r_config->reset_gpio);
-error:
-	return rc;
+static void dsi_panel_put_gpio(struct gpio_desc **desc)
+{
+	if (!IS_ERR_OR_NULL(*desc))
+		gpiod_put(*desc);
+	*desc = NULL;
 }
 
 static int dsi_panel_gpio_release(struct dsi_panel *panel)
 {
-	int rc = 0;
 	struct dsi_panel_reset_config *r_config = &panel->reset_config;
 
-	if (gpio_is_valid(r_config->reset_gpio))
-		gpio_free(r_config->reset_gpio);
+	dsi_panel_put_gpio(&r_config->reset_gpio);
+	dsi_panel_put_gpio(&r_config->disp_en_gpio);
+	dsi_panel_put_gpio(&r_config->oled_en_gpio);
+	dsi_panel_put_gpio(&panel->bl_config.en_gpio);
+	dsi_panel_put_gpio(&r_config->lcd_mode_sel_gpio);
+	dsi_panel_put_gpio(&panel->panel_test_gpio);
+	panel->gpios_held = false;
 
-	if (gpio_is_valid(r_config->disp_en_gpio))
-		gpio_free(r_config->disp_en_gpio);
+	return 0;
+}
 
-	if (panel->need_post_on_supply && gpio_is_valid(r_config->oled_en_gpio))
-		gpio_free(r_config->oled_en_gpio);
+/*
+ * Pins are requested as they are (GPIOD_ASIS) and driven with the raw calls,
+ * so the levels are the ones the panel's device tree and reset sequence give,
+ * as with the legacy GPIO API, whatever polarity flags the phandles carry.
+ */
+static int dsi_panel_gpio_request(struct dsi_panel *panel)
+{
+	struct dsi_panel_reset_config *r_config = &panel->reset_config;
+	bool primary = dsi_panel_is_primary(panel);
+	/* a secondary panel driven in sync with the primary shares its pins */
+	enum gpiod_flags share = (panel->ctl_op_sync && !primary) ?
+				 GPIOD_FLAGS_BIT_NONEXCLUSIVE : 0;
+	struct gpio_desc *desc;
+	int rc;
 
-	if (gpio_is_valid(panel->bl_config.en_gpio))
-		gpio_free(panel->bl_config.en_gpio);
+	if (panel->gpios_held)
+		return 0;
 
-	if (gpio_is_valid(panel->reset_config.lcd_mode_sel_gpio))
-		gpio_free(panel->reset_config.lcd_mode_sel_gpio);
+	desc = dsi_panel_gpiod_get(panel, dsi_panel_reset_gpio_name(panel),
+				   GPIOD_ASIS | share, "reset_gpio");
+	if (IS_ERR(desc)) {
+		rc = PTR_ERR(desc);
+		DSI_ERR("request for reset_gpio failed, rc=%d\n", rc);
+		goto error;
+	}
+	r_config->reset_gpio = desc;
 
-	if (gpio_is_valid(panel->panel_test_gpio))
-		gpio_free(panel->panel_test_gpio);
+	desc = dsi_panel_gpiod_get(panel, "qcom,5v-boost-gpio",
+				   GPIOD_ASIS | share, "disp_en_gpio");
+	if (!desc)
+		desc = dsi_panel_gpiod_get(panel, "qcom,platform-en-gpio",
+					   GPIOD_ASIS | share, "disp_en_gpio");
+	if (IS_ERR(desc)) {
+		rc = PTR_ERR(desc);
+		DSI_ERR("request for disp_en_gpio failed, rc=%d\n", rc);
+		goto error;
+	}
+	r_config->disp_en_gpio = desc;
 
+	if (panel->need_post_on_supply) {
+		desc = dsi_panel_gpiod_get(panel, primary ?
+				"qcom,platform-oled-en-gpio" :
+				"qcom,platform-sec-oled-en-gpio",
+				GPIOD_IN | share, "oled_en_gpio");
+		if (IS_ERR(desc)) {
+			rc = PTR_ERR(desc);
+			DSI_ERR("request for oled_en_gpio failed, rc=%d\n", rc);
+			goto error;
+		}
+		r_config->oled_en_gpio = desc;
+	}
+
+	desc = dsi_panel_gpiod_get(panel, "qcom,platform-bklight-en-gpio",
+				   GPIOD_ASIS | share, "bklt_en_gpio");
+	if (IS_ERR(desc)) {
+		rc = PTR_ERR(desc);
+		if (rc != -EPROBE_DEFER)
+			DSI_ERR("request for bklt_en_gpio failed, rc=%d\n", rc);
+		goto error;
+	}
+	panel->bl_config.en_gpio = desc;
+
+	desc = dsi_panel_gpiod_get(panel, primary ? "qcom,panel-mode-gpio" :
+				   "qcom,panel-sec-mode-gpio",
+				   GPIOD_ASIS | share, "mode_gpio");
+	if (IS_ERR(desc)) {
+		rc = PTR_ERR(desc);
+		DSI_ERR("request for mode_gpio failed, rc=%d\n", rc);
+		goto error;
+	}
+	r_config->lcd_mode_sel_gpio = desc;
+
+	desc = dsi_panel_gpiod_get(panel, "qcom,mdss-dsi-panel-test-pin",
+				   GPIOD_ASIS | share, "panel_test_gpio");
+	if (IS_ERR(desc)) {
+		DSI_WARN("request for panel_test_gpio failed, rc=%ld\n",
+			 PTR_ERR(desc));
+		desc = NULL;
+	}
+	panel->panel_test_gpio = desc;
+
+	panel->gpios_held = true;
+	return 0;
+
+error:
+	dsi_panel_gpio_release(panel);
 	return rc;
 }
 
-static int dsi_panel_trigger_esd_attack_sub(int reset_gpio)
+static int dsi_panel_trigger_esd_attack_sub(struct gpio_desc *reset_gpio)
 {
-	if (!gpio_is_valid(reset_gpio)) {
+	if (!reset_gpio) {
 		DSI_INFO("failed to pull down the reset gpio\n");
 		return -EINVAL;
 	}
 
-	gpio_set_value(reset_gpio, 0);
+	gpiod_set_raw_value(reset_gpio, 0);
 
 	SDE_EVT32(SDE_EVTLOG_FUNC_CASE1);
 	DSI_INFO("GPIO pulled low to simulate ESD\n");
@@ -279,35 +328,29 @@ static int dsi_panel_trigger_esd_attack_sub(int reset_gpio)
 
 static int dsi_panel_vm_trigger_esd_attack(struct dsi_panel *panel)
 {
-	struct dsi_parser_utils *utils = &panel->utils;
-	int reset_gpio;
-	int rc = 0;
+	struct gpio_desc *reset_gpio;
+	int rc;
 
-	reset_gpio = utils->get_named_gpio(utils->data,
-			"qcom,platform-reset-gpio", 0);
-	if (!gpio_is_valid(reset_gpio)) {
+	reset_gpio = dsi_panel_gpiod_get(panel, "qcom,platform-reset-gpio",
+					 GPIOD_ASIS | GPIOD_FLAGS_BIT_NONEXCLUSIVE,
+					 "reset_gpio");
+	if (IS_ERR_OR_NULL(reset_gpio)) {
 		DSI_ERR("[%s] reset gpio not provided\n", panel->name);
-		return -EINVAL;
-	}
-
-	rc = gpio_request(reset_gpio, "reset_gpio");
-	if (rc) {
-		DSI_ERR("request for reset_gpio failed, rc=%d\n", rc);
-		return rc;
+		return reset_gpio ? PTR_ERR(reset_gpio) : -EINVAL;
 	}
 
 	rc = dsi_panel_trigger_esd_attack_sub(reset_gpio);
 
-	gpio_free(reset_gpio);
+	gpiod_put(reset_gpio);
 
 	return rc;
 }
 
 static int dsi_panel_trigger_esd_attack(struct dsi_panel *panel)
 {
-	struct dsi_parser_utils *utils = &panel->utils;
 	struct dsi_panel_reset_config *r_config;
-	int reset_gpio;
+	struct gpio_desc *reset_gpio;
+	int rc;
 
 	if (!panel) {
 		DSI_ERR("Invalid panel param\n");
@@ -315,18 +358,21 @@ static int dsi_panel_trigger_esd_attack(struct dsi_panel *panel)
 	}
 
 	r_config = &panel->reset_config;
-	if (!r_config) {
-		DSI_ERR("Invalid panel reset configuration\n");
-		return -EINVAL;
-	}
+	if (r_config->reset_gpio || dsi_panel_is_primary(panel))
+		return dsi_panel_trigger_esd_attack_sub(r_config->reset_gpio);
 
-	reset_gpio = r_config->reset_gpio;
-	if ((!strcmp(panel->type, "secondary")) &&
-			(!gpio_is_valid(reset_gpio)))
-		reset_gpio = utils->get_named_gpio(utils->data,
-				"qcom,platform-reset-gpio", 0);
+	/* a secondary panel without its own reset shares the primary one */
+	reset_gpio = dsi_panel_gpiod_get(panel, "qcom,platform-reset-gpio",
+					 GPIOD_ASIS | GPIOD_FLAGS_BIT_NONEXCLUSIVE,
+					 "reset_gpio");
+	if (IS_ERR(reset_gpio))
+		return PTR_ERR(reset_gpio);
 
-	return dsi_panel_trigger_esd_attack_sub(reset_gpio);
+	rc = dsi_panel_trigger_esd_attack_sub(reset_gpio);
+	if (reset_gpio)
+		gpiod_put(reset_gpio);
+
+	return rc;
 }
 
 static int dsi_panel_reset(struct dsi_panel *panel)
@@ -335,11 +381,11 @@ static int dsi_panel_reset(struct dsi_panel *panel)
 	struct dsi_panel_reset_config *r_config = &panel->reset_config;
 	int i;
 
-	if (!gpio_is_valid(r_config->reset_gpio))
+	if (!r_config->reset_gpio)
 		goto skip_reset_gpio;
 
-	if (gpio_is_valid(panel->reset_config.disp_en_gpio)) {
-		rc = gpio_direction_output(panel->reset_config.disp_en_gpio, 1);
+	if (panel->reset_config.disp_en_gpio) {
+		rc = gpiod_direction_output_raw(panel->reset_config.disp_en_gpio, 1);
 		if (rc) {
 			DSI_ERR("unable to set dir for disp gpio rc=%d\n", rc);
 			goto exit;
@@ -347,7 +393,7 @@ static int dsi_panel_reset(struct dsi_panel *panel)
 	}
 
 	if (r_config->count) {
-		rc = gpio_direction_output(r_config->reset_gpio,
+		rc = gpiod_direction_output_raw(r_config->reset_gpio,
 			r_config->sequence[0].level);
 		if (rc) {
 			DSI_ERR("unable to set dir for rst gpio rc=%d\n", rc);
@@ -356,8 +402,8 @@ static int dsi_panel_reset(struct dsi_panel *panel)
 	}
 
 	for (i = 0; i < r_config->count; i++) {
-		gpio_set_value(r_config->reset_gpio,
-			       r_config->sequence[i].level);
+		gpiod_set_raw_value(r_config->reset_gpio,
+				    r_config->sequence[i].level);
 
 
 		if (r_config->sequence[i].sleep_ms)
@@ -366,13 +412,13 @@ static int dsi_panel_reset(struct dsi_panel *panel)
 	}
 
 skip_reset_gpio:
-	if (gpio_is_valid(panel->bl_config.en_gpio)) {
-		rc = gpio_direction_output(panel->bl_config.en_gpio, 1);
+	if (panel->bl_config.en_gpio) {
+		rc = gpiod_direction_output_raw(panel->bl_config.en_gpio, 1);
 		if (rc)
 			DSI_ERR("unable to set dir for bklt gpio rc=%d\n", rc);
 	}
 
-	if (gpio_is_valid(panel->reset_config.lcd_mode_sel_gpio)) {
+	if (panel->reset_config.lcd_mode_sel_gpio) {
 		bool out = true;
 
 		if ((panel->reset_config.mode_sel_state == MODE_SEL_DUAL_PORT)
@@ -385,14 +431,14 @@ skip_reset_gpio:
 				 == MODE_GPIO_HIGH))
 			out = true;
 
-		rc = gpio_direction_output(
+		rc = gpiod_direction_output_raw(
 			panel->reset_config.lcd_mode_sel_gpio, out);
 		if (rc)
 			DSI_ERR("unable to set dir for mode gpio rc=%d\n", rc);
 	}
 
-	if (gpio_is_valid(panel->panel_test_gpio)) {
-		rc = gpio_direction_input(panel->panel_test_gpio);
+	if (panel->panel_test_gpio) {
+		rc = gpiod_direction_input(panel->panel_test_gpio);
 		if (rc)
 			DSI_WARN("unable to set dir for panel test gpio rc=%d\n",
 					rc);
@@ -511,11 +557,11 @@ int dsi_panel_power_on(struct dsi_panel *panel, bool is_cont_splash)
 	goto exit;
 
 error_disable_gpio:
-	if (gpio_is_valid(panel->reset_config.disp_en_gpio))
-		gpio_set_value(panel->reset_config.disp_en_gpio, 0);
+	if (panel->reset_config.disp_en_gpio)
+		gpiod_set_raw_value(panel->reset_config.disp_en_gpio, 0);
 
-	if (gpio_is_valid(panel->bl_config.en_gpio))
-		gpio_set_value_cansleep(panel->bl_config.en_gpio, 0);
+	if (panel->bl_config.en_gpio)
+		gpiod_set_raw_value_cansleep(panel->bl_config.en_gpio, 0);
 
 	(void)dsi_panel_set_pinctrl_state(panel, false, is_cont_splash);
 
@@ -541,18 +587,18 @@ int dsi_panel_power_off(struct dsi_panel *panel)
 		return rc;
 	}
 
-	if (gpio_is_valid(panel->reset_config.disp_en_gpio))
-		gpio_set_value(panel->reset_config.disp_en_gpio, 0);
+	if (panel->reset_config.disp_en_gpio)
+		gpiod_set_raw_value(panel->reset_config.disp_en_gpio, 0);
 
-	if (gpio_is_valid(panel->reset_config.reset_gpio) &&
+	if (panel->reset_config.reset_gpio &&
 					!panel->reset_gpio_always_on)
-		gpio_set_value(panel->reset_config.reset_gpio, 0);
+		gpiod_set_raw_value(panel->reset_config.reset_gpio, 0);
 
-	if (gpio_is_valid(panel->reset_config.lcd_mode_sel_gpio))
-		gpio_set_value(panel->reset_config.lcd_mode_sel_gpio, 0);
+	if (panel->reset_config.lcd_mode_sel_gpio)
+		gpiod_set_raw_value(panel->reset_config.lcd_mode_sel_gpio, 0);
 
-	if (gpio_is_valid(panel->panel_test_gpio)) {
-		rc = gpio_direction_input(panel->panel_test_gpio);
+	if (panel->panel_test_gpio) {
+		rc = gpiod_direction_input(panel->panel_test_gpio);
 		if (rc)
 			DSI_WARN("set dir for panel test gpio failed rc=%d\n",
 				 rc);
@@ -3190,12 +3236,12 @@ static int dsi_panel_post_pwr_ctrl(struct dsi_panel *panel, bool enable)
 		return 0;
 
 	r_config = &panel->reset_config;
-	if (gpio_is_valid(r_config->oled_en_gpio)) {
+	if (r_config->oled_en_gpio) {
 		if (enable) {
-			rc = poll_status_timeout((gpio_get_value(r_config->oled_en_gpio) == 1),
+			rc = poll_status_timeout((gpiod_get_raw_value(r_config->oled_en_gpio) == 1),
 				sleep_us, timeout_us);
 		} else {
-			rc = poll_status_timeout((gpio_get_value(r_config->oled_en_gpio) == 0),
+			rc = poll_status_timeout((gpiod_get_raw_value(r_config->oled_en_gpio) == 0),
 				sleep_us, timeout_us);
 		}
 
@@ -3255,22 +3301,23 @@ error:
 int dsi_panel_get_io_resources(struct dsi_panel *panel,
 		struct msm_io_res *io_res)
 {
-	struct dsi_parser_utils *utils = &panel->utils;
 	struct list_head *mem_list = &io_res->mem;
-	int reset_gpio;
+	struct gpio_desc *reset_gpio;
 	int rc = 0;
 
-	reset_gpio = utils->get_named_gpio(utils->data,
-					      "qcom,platform-reset-gpio", 0);
-	if (gpio_is_valid(reset_gpio)) {
-		rc = msm_dss_get_gpio_io_mem(reset_gpio, mem_list);
-		if (rc) {
+	/* the TLMM register range of the pin, handed to the trusted VM */
+	reset_gpio = dsi_panel_gpiod_get(panel, "qcom,platform-reset-gpio",
+					 GPIOD_ASIS | GPIOD_FLAGS_BIT_NONEXCLUSIVE,
+					 "reset_gpio");
+	if (IS_ERR(reset_gpio))
+		return PTR_ERR(reset_gpio);
+	if (reset_gpio) {
+		rc = msm_dss_get_gpio_io_mem(desc_to_gpio(reset_gpio), mem_list);
+		gpiod_put(reset_gpio);
+		if (rc)
 			DSI_ERR("[%s] failed to retrieve the reset gpio address\n", panel->name);
-			goto end;
-		}
 	}
 
-end:
 	return rc;
 }
 
@@ -3279,54 +3326,20 @@ static int dsi_panel_parse_gpios(struct dsi_panel *panel)
 	int rc = 0;
 	const char *data;
 	struct dsi_parser_utils *utils = &panel->utils;
-	char *reset_gpio_name, *mode_set_gpio_name, *oled_en_gpio_name;
 
-	if (!strcmp(panel->type, "primary")) {
-		reset_gpio_name = "qcom,platform-reset-gpio";
-		mode_set_gpio_name = "qcom,panel-mode-gpio";
-		oled_en_gpio_name = "qcom,platform-oled-en-gpio";
-	} else {
-		reset_gpio_name = "qcom,platform-sec-reset-gpio";
-		mode_set_gpio_name = "qcom,panel-sec-mode-gpio";
-		oled_en_gpio_name = "qcom,platform-sec-oled-en-gpio";
-	}
-
-	panel->reset_config.reset_gpio = utils->get_named_gpio(utils->data,
-					      reset_gpio_name, 0);
-	if (!gpio_is_valid(panel->reset_config.reset_gpio) &&
-		!panel->host_config.ext_bridge_mode) {
-		DSI_DEBUG("[%s] reset gpio not set, rc=%d\n", panel->name,
-			panel->reset_config.reset_gpio);
-	}
-
-	panel->reset_config.disp_en_gpio = utils->get_named_gpio(utils->data,
-						"qcom,5v-boost-gpio",
-						0);
-	if (!gpio_is_valid(panel->reset_config.disp_en_gpio)) {
-		DSI_DEBUG("[%s] 5v-boot-gpio is not set, rc=%d\n",
-			 panel->name, rc);
-		panel->reset_config.disp_en_gpio =
-				utils->get_named_gpio(utils->data,
-					"qcom,platform-en-gpio", 0);
-		if (!gpio_is_valid(panel->reset_config.disp_en_gpio)) {
-			DSI_DEBUG("[%s] platform-en-gpio is not set, rc=%d\n",
-				 panel->name, rc);
-		}
-	}
-
-	if (panel->need_post_on_supply) {
-		panel->reset_config.oled_en_gpio = panel->utils.get_named_gpio(panel->utils.data,
-							oled_en_gpio_name, 0);
-		if (!gpio_is_valid(panel->reset_config.oled_en_gpio))
-			DSI_DEBUG("[%s] oled-en-gpio is not set\n", panel->name);
-	}
-
-	panel->reset_config.lcd_mode_sel_gpio = utils->get_named_gpio(
-		utils->data, mode_set_gpio_name, 0);
-	if (!gpio_is_valid(panel->reset_config.lcd_mode_sel_gpio))
-		DSI_DEBUG("mode gpio not specified\n");
-
-	DSI_DEBUG("mode gpio=%d\n", panel->reset_config.lcd_mode_sel_gpio);
+	/*
+	 * The GPIOs themselves are requested in dsi_panel_gpio_request(), when
+	 * the panel driver initializes; only note here whether there is a
+	 * reset line, which dsi_display checks before that.
+	 */
+	panel->reset_config.has_reset_gpio =
+		panel->utils.get_property == of_get_property &&
+		panel->panel_of_node &&
+		of_property_present(panel->panel_of_node,
+				    dsi_panel_reset_gpio_name(panel));
+	if (!panel->reset_config.has_reset_gpio &&
+		!panel->host_config.ext_bridge_mode)
+		DSI_DEBUG("[%s] reset gpio not set\n", panel->name);
 
 	data = utils->get_property(utils->data,
 		"qcom,mdss-dsi-mode-sel-gpio-state", NULL);
@@ -3355,13 +3368,6 @@ static int dsi_panel_parse_gpios(struct dsi_panel *panel)
 		       panel->name, rc);
 		goto error;
 	}
-
-	panel->panel_test_gpio = utils->get_named_gpio(utils->data,
-					"qcom,mdss-dsi-panel-test-pin",
-					0);
-	if (!gpio_is_valid(panel->panel_test_gpio))
-		DSI_DEBUG("%s:%d panel test gpio not specified\n", __func__,
-			 __LINE__);
 
 error:
 	return rc;
@@ -3494,23 +3500,6 @@ static int dsi_panel_parse_bl_config(struct dsi_panel *panel)
 		if (rc) {
 			DSI_ERR("[%s] failed to parse pwm config, rc=%d\n",
 			       panel->name, rc);
-			goto error;
-		}
-	}
-
-	panel->bl_config.en_gpio = utils->get_named_gpio(utils->data,
-					      "qcom,platform-bklight-en-gpio",
-					      0);
-	if (!gpio_is_valid(panel->bl_config.en_gpio)) {
-		if (panel->bl_config.en_gpio == -EPROBE_DEFER) {
-			DSI_DEBUG("[%s] failed to get bklt gpio, rc=%d\n",
-					panel->name, rc);
-			rc = -EPROBE_DEFER;
-			goto error;
-		} else {
-			DSI_DEBUG("[%s] failed to get bklt gpio, rc=%d\n",
-					 panel->name, rc);
-			rc = 0;
 			goto error;
 		}
 	}
@@ -7478,8 +7467,8 @@ int dsi_panel_pre_disable(struct dsi_panel *panel)
 
 	mutex_lock(&panel->panel_lock);
 
-	if (gpio_is_valid(panel->bl_config.en_gpio))
-		gpio_set_value_cansleep(panel->bl_config.en_gpio, 0);
+	if (panel->bl_config.en_gpio)
+		gpiod_set_raw_value_cansleep(panel->bl_config.en_gpio, 0);
 
 	rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_PRE_OFF, false);
 	if (rc) {

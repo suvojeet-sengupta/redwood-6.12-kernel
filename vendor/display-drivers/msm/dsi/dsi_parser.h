@@ -47,13 +47,6 @@ int dsi_parser_count_strings(const struct device_node *np,
 int dsi_parser_read_string_index(const struct device_node *np,
 				const char *propname,
 				int index, const char **output);
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-int dsi_parser_get_named_gpio(const struct device_node *np,
-				const char *propname, int index);
-#else
-int dsi_parser_get_named_gpio(struct device_node *np,
-				const char *propname, int index);
-#endif
 #else /* CONFIG_DSI_PARSER */
 static inline void *dsi_parser_get(struct device *dev)
 {
@@ -163,17 +156,7 @@ static inline int dsi_parser_read_string_index(const struct device_node *np,
 }
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-static inline int dsi_parser_get_named_gpio(const struct device_node *np,
-				const char *propname, int index)
-{
-	return -ENODEV;
-}
 #else
-static inline int dsi_parser_get_named_gpio(struct device_node *np,
-				char *propname, int index)
-{
-	return -ENODEV;
-}
 #endif
 
 #endif /* CONFIG_DSI_PARSER */
@@ -217,11 +200,7 @@ struct dsi_parser_utils {
 	int (*count_strings)(const struct device_node *np,
 					const char *propname);
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-	int (*get_named_gpio)(const struct device_node *np,
-				const char *propname, int index);
 #else
-	int (*get_named_gpio)(struct device_node *np,
-				const char *propname, int index);
 #endif
 	int (*get_available_child_count)(const struct device_node *np);
 };
@@ -244,7 +223,6 @@ static inline struct dsi_parser_utils *dsi_parser_get_of_utils(void)
 		.get_next_child = of_get_next_child,
 		.count_u32_elems = of_property_count_u32_elems,
 		.count_strings = of_property_count_strings,
-		.get_named_gpio = of_get_named_gpio,
 	};
 
 	return &of_utils;
@@ -268,7 +246,6 @@ static inline struct dsi_parser_utils *dsi_parser_get_parser_utils(void)
 		.get_next_child = dsi_parser_get_next_child,
 		.count_u32_elems = dsi_parser_count_u32_elems,
 		.count_strings = dsi_parser_count_strings,
-		.get_named_gpio = dsi_parser_get_named_gpio,
 	};
 
 	return &parser_utils;

@@ -7,6 +7,7 @@
 #include <linux/list.h>
 #include <linux/of.h>
 #include <linux/of_gpio.h>
+#include <linux/gpio/consumer.h>
 #include <linux/err.h>
 #include <linux/version.h>
 #include <linux/ktime.h>
@@ -715,6 +716,13 @@ static void dsi_display_parse_te_data(struct dsi_display *display)
 		return;
 	}
 
+	/*
+	 * TE stays a pin number: dsi_display_register_te_irq() saves and
+	 * restores the pin's TLMM FUNC_SEL around the IRQ request, which
+	 * switches it to the GPIO function, and needs the pin's register
+	 * address for that. Requesting it as a descriptor would switch the
+	 * function as well, outside that save and restore.
+	 */
 	display->disp_te_gpio = of_get_named_gpio(dev->of_node,
 					"qcom,platform-te-gpio", 0);
 
@@ -4806,7 +4814,7 @@ static bool dsi_display_validate_panel_resources(struct dsi_display *display)
 
 	if (!is_sim_panel(display)) {
 		if (!display->panel->host_config.ext_bridge_mode &&
-				!gpio_is_valid(display->panel->reset_config.reset_gpio)) {
+				!display->panel->reset_config.has_reset_gpio) {
 			DSI_ERR("invalid reset gpio for the panel\n");
 			return false;
 		}
@@ -6327,7 +6335,8 @@ static int dsi_display_get_io_resources(struct msm_io_res *io_res, void *data)
 	int rc = 0;
 	struct dsi_display *display;
 	struct platform_device *pdev;
-	int te_gpio, avdd_gpio;
+	struct gpio_desc *avdd_gpio;
+	int te_gpio;
 
 	if (!data)
 		return -EINVAL;
@@ -6362,10 +6371,13 @@ static int dsi_display_get_io_resources(struct msm_io_res *io_res, void *data)
 		}
 	}
 
-	avdd_gpio = of_get_named_gpio(pdev->dev.of_node,
-			"qcom,avdd-regulator-gpio", 0);
-	if (gpio_is_valid(avdd_gpio)) {
-		rc = msm_dss_get_gpio_io_mem(avdd_gpio, &io_res->mem);
+	avdd_gpio = devm_gpiod_get_optional(&pdev->dev, "qcom,avdd-regulator",
+					    GPIOD_ASIS | GPIOD_FLAGS_BIT_NONEXCLUSIVE);
+	if (IS_ERR(avdd_gpio))
+		return PTR_ERR(avdd_gpio);
+	if (avdd_gpio) {
+		rc = msm_dss_get_gpio_io_mem(desc_to_gpio(avdd_gpio), &io_res->mem);
+		devm_gpiod_put(&pdev->dev, avdd_gpio);
 		if (rc)
 			DSI_ERR("[%s] failed to retrieve the avdd gpio address\n",
 					display->panel->name);
