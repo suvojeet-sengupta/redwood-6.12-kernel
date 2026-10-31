@@ -176,11 +176,11 @@
 					qcom,mdss-dsi-fps-switch-command = [
 						15 01 00 00 00 00 02 6C 02
 					];
-					qcom,mdss-dsi-fps-switch-command-state = "dsi_lp_mode";
+					qcom,mdss-dsi-fps-switch-command-state = "dsi_hs_mode";
 					qcom,mdss-dsi-post-panel-on-command = [
 						15 01 00 00 00 00 02 6C 02
 					];
-					qcom,mdss-dsi-post-on-command-state = "dsi_lp_mode";
+					qcom,mdss-dsi-post-on-command-state = "dsi_hs_mode";
 				};
 
 				fps-60 {
@@ -188,11 +188,11 @@
 					qcom,mdss-dsi-fps-switch-command = [
 						15 01 00 00 00 00 02 6C 00
 					];
-					qcom,mdss-dsi-fps-switch-command-state = "dsi_lp_mode";
+					qcom,mdss-dsi-fps-switch-command-state = "dsi_hs_mode";
 					qcom,mdss-dsi-post-panel-on-command = [
 						15 01 00 00 00 00 02 6C 00
 					];
-					qcom,mdss-dsi-post-on-command-state = "dsi_lp_mode";
+					qcom,mdss-dsi-post-on-command-state = "dsi_hs_mode";
 				};
 			};
 		};
