@@ -1736,6 +1736,25 @@ static void battery_chg_subsys_up_work(struct work_struct *work)
 			pr_err("Failed to set USB-2 ICL(%u uA), rc=%d\n",
 				bcdev->usb_icl_ua[USB_2_PORT_ID], rc);
 	}
+
+	/*
+	 * Xiaomi's charger firmware keeps neither the thermal level nor the
+	 * battery authentication result across a restart
+	 */
+	if (bcdev->curr_thermal_level) {
+		rc = write_property_id(bcdev, &bcdev->psy_list[PSY_TYPE_BATTERY],
+				BATT_CHG_CTRL_LIM, bcdev->curr_thermal_level);
+		if (rc < 0)
+			pr_err("Failed to set thermal level %d, rc=%d\n",
+				bcdev->curr_thermal_level, rc);
+	}
+
+	if (bcdev->battery_auth) {
+		rc = write_property_id(bcdev, &bcdev->psy_list[PSY_TYPE_XM],
+				XM_PROP_AUTHENTIC, 1);
+		if (rc < 0)
+			pr_err("Failed to set battery authentic, rc=%d\n", rc);
+	}
 }
 
 static int wireless_fw_send_firmware(struct battery_chg_dev *bcdev,
