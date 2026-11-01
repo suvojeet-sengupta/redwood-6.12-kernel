@@ -1912,18 +1912,9 @@ static int msm_pinctrl_hibernation_suspend(void)
 	    (pm_suspend_target_state != PM_SUSPEND_MEM ||
 	     !IS_ENABLED(CONFIG_DEEPSLEEP)))
 		return 0;
-	pctrl->gpio_regs = kcalloc(soc->ngroups,
-		sizeof(*pctrl->gpio_regs), GFP_KERNEL);
-	if (pctrl->gpio_regs == NULL)
-		return -ENOMEM;
-	if (soc->ntiles) {
-		pctrl->msm_tile_regs = kcalloc(soc->ntiles,
-				   sizeof(*pctrl->msm_tile_regs), GFP_KERNEL);
-		if (pctrl->msm_tile_regs == NULL) {
-			kfree(pctrl->gpio_regs);
-			return -ENOMEM;
-		}
-	}
+	/* Syscore callbacks run with interrupts off; the buffers come from probe */
+	if (!pctrl->gpio_regs || (soc->ntiles && !pctrl->msm_tile_regs))
+		return 0;
 
 	/* Save direction conn registers for hmss */
 	for (i = 0; i < soc->ntiles; i++) {
@@ -1933,7 +1924,7 @@ static int msm_pinctrl_hibernation_suspend(void)
 		else
 			tile_addr = pctrl->regs[0] + soc->dir_conn_addr[i];
 
-		pr_err("The tile addr generated is 0x%llx\n", (u64)tile_addr);
+		pr_debug("The tile addr generated is 0x%llx\n", (u64)tile_addr);
 		for (j = 0; j < 8; j++)
 			pctrl->msm_tile_regs[i].dir_con_regs[j] =
 				readl_relaxed(tile_addr + j*4);
@@ -1992,7 +1983,7 @@ static void msm_pinctrl_hibernation_resume(void)
 			tile_addr = pctrl->regs[i] + soc->dir_conn_addr[i];
 		else
 			tile_addr = pctrl->regs[0] + soc->dir_conn_addr[i];
-		pr_err("The tile addr generated is 0x%llx\n", (u64)tile_addr);
+		pr_debug("The tile addr generated is 0x%llx\n", (u64)tile_addr);
 		for (j = 0; j < 8; j++)
 			writel_relaxed(pctrl->msm_tile_regs[i].dir_con_regs[j],
 					tile_addr + j*4);
@@ -2026,10 +2017,6 @@ static void msm_pinctrl_hibernation_resume(void)
 			msm_writel_io(pctrl->gpio_regs[i].io_reg,
 					pctrl, pgroup);
 	}
-	kfree(pctrl->gpio_regs);
-	kfree(pctrl->msm_tile_regs);
-	pctrl->gpio_regs = NULL;
-	pctrl->msm_tile_regs = NULL;
 }
 
 static struct syscore_ops msm_pinctrl_pm_ops = {
@@ -2336,6 +2323,17 @@ int msm_pinctrl_probe(struct platform_device *pdev,
 	platform_set_drvdata(pdev, pctrl);
 
 #ifdef CONFIG_HIBERNATION
+	pctrl->gpio_regs = devm_kcalloc(&pdev->dev, pctrl->soc->ngroups,
+					sizeof(*pctrl->gpio_regs), GFP_KERNEL);
+	if (!pctrl->gpio_regs)
+		return -ENOMEM;
+	if (pctrl->soc->ntiles) {
+		pctrl->msm_tile_regs = devm_kcalloc(&pdev->dev, pctrl->soc->ntiles,
+						    sizeof(*pctrl->msm_tile_regs),
+						    GFP_KERNEL);
+		if (!pctrl->msm_tile_regs)
+			return -ENOMEM;
+	}
 	register_syscore_ops(&msm_pinctrl_pm_ops);
 	ret = register_pm_notifier(&pinctrl_notif_block);
 	if (ret)
