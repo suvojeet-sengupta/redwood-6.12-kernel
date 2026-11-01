@@ -8,31 +8,54 @@ ship with) moved onto redwood, which came with a 5.4 kernel. It runs the
 normal 5.4-era vendor and firmware of the phone, so most of the work here is
 making the new kernel speak the way the old vendor blobs expect.
 
-The kernel calls itself **6.12.96-Suvkernel**: Qualcomm's
-`KERNEL.PLATFORM.5.0` with Google's `android16-6.12` (Linux 6.12.96) merged in.
+The current release is **Suvkernel 2.0** (`6.12.97-Suvkernel-2.0`):
+Qualcomm's `KERNEL.PLATFORM.5.0` with Google's `android16-6.12` (Linux
+6.12.97) merged in.
 
-## Branches
+## Branches and tags
 
-| Branch | What |
+| Ref | What |
 |---|---|
-| `main` | **Use this.** Qualcomm `KERNEL.PLATFORM.5.0.r48-00400`, its common kernel at `ks-kernel.lnx.5.0.r81` and AOSP `android16-6.12` (6.12.96), with every redwood fix |
+| `main` | **Use this.** Qualcomm `KERNEL.PLATFORM.5.0.r48-00400`, its common kernel at `ks-kernel.lnx.5.0.r81` and AOSP `android16-6.12` (6.12.97), with every redwood fix |
+| `v2.0` | Suvkernel 2.0 |
 | `r35` | The first port, on the older `r35-02100` release. Kept for history |
+| `archive/pre-2.0` | `main` as it was before its history was tidied for 2.0. The prebuilt's older commits name kernel commits from it |
 
 ## What works
 
-Display (120 Hz), touch with double tap to wake, GPU, Wi-Fi, Bluetooth, SIMs
-and mobile data, speakers, earpiece, microphones, video playback, camera,
-fingerprint, IR blaster, vibration, deep sleep, charging with Xiaomi's
-battery authentication, Widevine L1, USB file transfer, and KernelSU (as a
-loadable module).
+Display at 120 and 60 Hz, touch with double tap to wake (Goodix and
+FocalTech panels), GPU, Wi-Fi, Bluetooth and its audio, SIMs, mobile data
+including 5G, speakers, earpiece, microphones, video playback, camera,
+fingerprint, IR blaster, vibration, deep sleep, PD fast charging with
+Xiaomi's battery and adapter authentication, Widevine L1, USB file transfer,
+and KernelSU (as a loadable module).
 
-Known gaps:
+Known issues:
 
-- Fast PD charging (67 W) doesn't start yet: the charger firmware reports
-  no PD contract.
-- The panel stays at 120 Hz. Switching it to 90 or 60 Hz, as the 5.4 kernel
-  could, floods the DSI host with FIFO errors until reboot, so dynamic fps is
-  off.
+- The phone can now and then stay dark after sleeping until it is forced to
+  reboot. It is being worked on.
+- Hardware video encoding fails for some encoder settings (HFI error
+  0x1008); decoding is not affected.
+
+## What's new in 2.0
+
+- **Charging.** The ADSP's Type-C stack only reports the port once the host
+  enables pin assignment notifications; that was waiting for a DisplayPort
+  client redwood doesn't have. Chargers are now seen as PD PPS and fast
+  charge.
+- **Display.** 60/120 Hz switching is back, without the FIFO errors: the
+  DSC link is sized for RGB888 and the rate's gamma bank is sent in HS mode
+  inside the blanking, so a switch no longer blanks a frame.
+- **Mobile data.** The downlink reaches the stack in pages instead of being
+  copied (5G SA was held around 30 Mbps), TX completes in NAPI, and IPA and
+  RmNet carry a set of Qualcomm fixes.
+- **Battery and heat.** RT tasks no longer start at the top frequency, so
+  the big cores stay low with a static screen; Xiaomi's thermal zones are
+  all there for `mi_thermald`.
+- **Sleep and wake.** Interrupts that fire while suspended are replayed
+  instead of lost, plus pinctrl, RPMh, gdsc, UFS and tsens fixes.
+- **Audio, Wi-Fi, video, Bluetooth.** Fixes from genie1997's redwood 6.12
+  tree, including a use-after-free in the LSM (hotword) driver.
 
 ## Works with any redwood ROM
 
@@ -42,13 +65,9 @@ swap the kernel in (see "Using it in a ROM" below):
 
 - **Old sysfs paths.** SPMI devices keep their 5.4 names (`spmi0-02`), so
   the torch and the PMIC ADC keep their paths, permissions and labels.
-- **Old tuning scripts.** A 5.4 `post_boot` writes `/proc/sys/kernel/sched_*`,
-  `/sys/devices/system/cpu/cpu_boost` and picks the `schedutil` governor.
-  Those paths exist again and lead to WALT, and `schedutil` is handed WALT's
-  governor. redwood's tuning is also WALT's default, so it holds even if the
-  script never runs.
-- **No stuck boost.** WALT's boot-time boost ends on its own a minute after
-  boot, and core control never pauses the big cores.
+- **Scheduling.** The kernel schedules with PELT, EAS and `schedutil`. WALT
+  is built but turned off on the command line, so a 5.4 `post_boot` that
+  writes WALT's tunables finds its paths and changes nothing.
 - **Wi-Fi.** Runtime power management stays off whatever the ROM's
   `WCNSS_qcom_cfg.ini` says; with it on, a WCN6750 wake-up could reset the
   phone.
@@ -76,14 +95,15 @@ redwood's charger firmware is Xiaomi's, so `qti_battery_charger` is Xiaomi's
 driver from the LineageOS sm8350 kernel, ported onto Qualcomm's 6.12 one. It
 speaks Xiaomi's property layout, has all of Xiaomi's `qcom-battery` nodes
 (battery and adapter authentication, fast charge mode, fuel gauge details),
-tells the firmware when the screen is off, and gives the `battery` thermal
-zone the fuel gauge's temperature.
+tells the firmware when the screen is off, sends the thermal level and the
+battery authentication again after the charger firmware restarts, and gives
+the `battery` thermal zone the fuel gauge's temperature.
 
 ## Where things are
 
 | Path | What | Upstream |
 |---|---|---|
-| `kernel_platform/common` | The kernel itself (Android `android16-6.12`) | `ks-kernel.lnx.5.0.r81-rel` + AOSP `android16-6.12` (6.12.96) |
+| `kernel_platform/common` | The kernel itself (Android `android16-6.12`) | `ks-kernel.lnx.5.0.r81-rel` + AOSP `android16-6.12` (6.12.97) |
 | `kernel_platform/soc-repo` | Qualcomm SoC drivers built as modules | `kernel.lnx.6.12.r69-rel` |
 | `kernel_platform/qcom/opensource/devicetree` | Device trees, redwood's in `qcom/redwood-*` | `kernel.lnx.6.12.r69-rel` |
 | `vendor/display-drivers`, `vendor/mm-drivers` | Display | `display-kernel.lnx.12.13.r1-rel` |
@@ -126,15 +146,20 @@ done
 
 Keep `common`, `qcom` and `soc-repo` from this repository. The scripts that
 build everything (kernel, vendor modules, `dtbo.img`) and pack it for the
-ROM are in [redwood-6.12](https://github.com/suvojeet-sengupta/redwood-6.12).
+ROM or as a flashable zip are in
+[redwood-6.12](https://github.com/suvojeet-sengupta/redwood-6.12).
 
-## Using it in a ROM
+## Installing
 
-Don't build the kernel inside the ROM. The ready-made kernel, modules and
-`dtbo.img` are in
-[device_xiaomi_redwood-kernel-6.12](https://github.com/suvojeet-sengupta/device_xiaomi_redwood-kernel-6.12),
-whose README lists the few lines a device tree needs. The redwood device
-tree's `clo-6.12` branch already uses it.
+- **Flashable zip.** Each release has an AnyKernel3 zip
+  (`Suvkernel-2.0-redwood-*.zip`) that flashes from recovery. It replaces
+  the kernel, the modules in `vendor_boot` and `dtbo`, and keeps the boot
+  ramdisk, so KernelSU or Magisk stay installed.
+- **In a ROM.** Don't build the kernel inside the ROM. The ready-made
+  kernel, modules and `dtbo.img` are in
+  [device_xiaomi_redwood-kernel-6.12](https://github.com/suvojeet-sengupta/device_xiaomi_redwood-kernel-6.12),
+  whose README lists the few lines a device tree needs. The redwood device
+  tree's `clo-6.12` branch already uses it.
 
 ROMs that build with Dolby set `debug.c2.use_dmabufheaps=1`; on this kernel
 that leaves the 32-bit video codecs without their ION buffers, so set it
@@ -142,7 +167,18 @@ back to `0` in the device tree.
 
 ## Credits
 
-Qualcomm and CodeLinaro for the kernel platform, the LineageOS sm8350 kernel
-for the Xiaomi charger driver and for driver and device tree references.
+- Qualcomm and CodeLinaro for the kernel platform, and Google for the
+  Android common kernel.
+- genie1997 for the redwood 6.12 tree whose fixes many commits here come
+  from, kept under their name.
+- The upstream authors whose fixes were taken from Linux stable and
+  Qualcomm's releases, also kept under their names.
+- The LineageOS sm8350 kernel for the Xiaomi charger driver and for driver
+  and device tree references.
 
 Ported and maintained by Suvojeet Sengupta.
+
+## License
+
+The kernel is GPL-2.0, see `kernel_platform/common/COPYING`. Other parts
+carry their own license headers.
