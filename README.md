@@ -8,7 +8,7 @@ ship with) moved onto redwood, which came with a 5.4 kernel. It runs the
 normal 5.4-era vendor and firmware of the phone, so most of the work here is
 making the new kernel speak the way the old vendor blobs expect.
 
-The current release is **Suvkernel 2.0** (`6.12.97-Suvkernel-2.0`):
+The current release is **Suvkernel 3.0** (`6.12.97-Suvkernel-3.0`):
 Qualcomm's `KERNEL.PLATFORM.5.0` with Google's `android16-6.12` (Linux
 6.12.97) merged in.
 
@@ -17,6 +17,7 @@ Qualcomm's `KERNEL.PLATFORM.5.0` with Google's `android16-6.12` (Linux
 | Ref | What |
 |---|---|
 | `main` | **Use this.** Qualcomm `KERNEL.PLATFORM.5.0.r48-00400`, its common kernel at `ks-kernel.lnx.5.0.r81` and AOSP `android16-6.12` (6.12.97), with every redwood fix |
+| `v3.0` | Suvkernel 3.0 |
 | `v2.0` | Suvkernel 2.0 |
 | `r35` | The first port, on the older `r35-02100` release. Kept for history |
 | `archive/pre-2.0` | `main` as it was before its history was tidied for 2.0. The prebuilt's older commits name kernel commits from it |
@@ -32,10 +33,22 @@ and KernelSU (as a loadable module).
 
 Known issues:
 
-- The phone can now and then stay dark after sleeping until it is forced to
-  reboot. It is being worked on.
 - Hardware video encoding fails for some encoder settings (HFI error
   0x1008); decoding is not affected.
+
+## What's new in 3.0
+
+- **Sleep.** The phone no longer goes dead, or powers off, the first time
+  it sleeps after a boot. That was deep suspend through PSCI system
+  suspend; the kernel now boots with `mem_sleep_s2idle_only`, so it only
+  ever suspends with s2idle, whatever a ROM's `post_boot` asks for.
+- **Crashes.** A kernel oops no longer leaves a black screen that ignores
+  the power key: a panic reboots the phone after five seconds. A NULL
+  dereference in `finish_task_switch()`, a 6.12.95 regression in the block
+  layer's plug timestamp, is fixed.
+- **Upstream fixes.** AOSP `android16-6.12` proxy execution and
+  blk-crypto fixes, Qualcomm display and kgsl (a6xx) fixes, and a bound on
+  the battery driver's `verify_digest` copy.
 
 ## What's new in 2.0
 
@@ -156,7 +169,7 @@ ROM or as a flashable zip are in
 ## Installing
 
 - **Flashable zip.** Each release has an AnyKernel3 zip
-  (`Suvkernel-2.0-redwood-*.zip`) that flashes from recovery. It replaces
+  (`Suvkernel-<version>-redwood-*.zip`) that flashes from recovery. It replaces
   the kernel, the modules in `vendor_boot` and `dtbo`, and keeps the boot
   ramdisk, so KernelSU or Magisk stay installed.
 - **In a ROM.** Don't build the kernel inside the ROM. The ready-made
