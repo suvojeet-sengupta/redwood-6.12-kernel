@@ -1542,12 +1542,13 @@ static unsigned int __maybe_unused sysctl_sched_uclamp_util_max = SCHED_CAPACITY
  * above.
  */
 /*
- * redwood: leave RT tasks to schedutil like CFS ones. SurfaceFlinger, the
- * composer and input threads are RT and run every frame; clamped to 1024
- * they held the big cores at their top frequency with the screen just
- * showing a static app.
+ * redwood: RT tasks start at half capacity rather than full. SurfaceFlinger,
+ * the composer and input threads are RT and run every frame; clamped to 1024
+ * they held the big cores at their top frequency with the screen showing a
+ * static app, and with no floor the blur of the shade, recents and app
+ * launches waited on schedutil to ramp up.
  */
-unsigned int sysctl_sched_uclamp_util_min_rt_default;
+unsigned int sysctl_sched_uclamp_util_min_rt_default = SCHED_CAPACITY_SCALE / 2;
 
 /* All clamps are required to be less or equal than these values */
 static struct uclamp_se uclamp_default[UCLAMP_CNT];
