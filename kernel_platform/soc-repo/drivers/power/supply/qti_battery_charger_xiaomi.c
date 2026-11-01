@@ -372,7 +372,8 @@ static ssize_t verify_digest_store(const struct class *c,
 						 XM_PROP_VERIFY_DIGEST, random);
 	} else {
 		memset(kbuf_1s, 0, sizeof(kbuf_1s));
-		memcpy(kbuf_1s, buf, min(count, sizeof(kbuf_1s) - 1));
+		memcpy(kbuf_1s, buf, min3(count, sizeof(kbuf_1s) - 1,
+					  (size_t)(2 * BATTERY_DIGEST_LEN)));
 		strim(kbuf_1s);
 		StringToHex(kbuf_1s, random_1s, &i);
 		pr_err("verify_digest_store  1s:%s \n", random_1s);
