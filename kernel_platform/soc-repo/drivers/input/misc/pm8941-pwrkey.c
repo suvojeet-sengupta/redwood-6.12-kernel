@@ -399,11 +399,11 @@ static int pm8941_pwrkey_resume(struct device *dev)
 {
 	struct pm8941_pwrkey *pwrkey = dev_get_drvdata(dev);
 
-	if (pm_suspend_target_state == PM_SUSPEND_MEM)
-		return pm8941_pwrkey_restore(dev);
-
 	if (device_may_wakeup(dev))
 		disable_irq_wake(pwrkey->irq);
+
+	if (pm_suspend_target_state == PM_SUSPEND_MEM)
+		return pm8941_pwrkey_restore(dev);
 
 	return 0;
 }
