@@ -207,4 +207,4 @@ fi
 
 # redwood: release the kernel as Suvkernel 1.0, like the 5.4 builds, instead of
 # Kleaf's -android16-6-maybe-dirty plus the lahaina -4k
-echo "${KERNELVERSION}-Suvkernel-2.0"
+echo "${KERNELVERSION}-Suvkernel-3.0"
