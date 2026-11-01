@@ -38,10 +38,11 @@ Known issues:
 
 ## What's new in 3.0
 
-- **Sleep.** The phone no longer goes dead, or powers off, the first time
-  it sleeps after a boot. That was deep suspend through PSCI system
-  suspend; the kernel now boots with `mem_sleep_s2idle_only`, so it only
-  ever suspends with s2idle, whatever a ROM's `post_boot` asks for.
+- **Sleep.** The phone no longer goes dead after its first suspend
+  following a boot. 6.12.97 brought a PM change made for newer kernels
+  (`device_pm_sleep_init()` signalling its completion only once) that
+  could leave a suspend waiting forever on 6.12; it is reverted, as the
+  stable trees are doing.
 - **Crashes.** A kernel oops no longer leaves a black screen that ignores
   the power key: a panic reboots the phone after five seconds. A NULL
   dereference in `finish_task_switch()`, a 6.12.95 regression in the block
