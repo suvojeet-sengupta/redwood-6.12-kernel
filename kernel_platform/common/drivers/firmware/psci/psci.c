@@ -544,12 +544,26 @@ static void __init psci_init_system_reset2(void)
 		psci_system_reset2_supported = true;
 }
 
+static bool psci_system_suspend_off __initdata;
+
+static int __init psci_no_system_suspend(char *str)
+{
+	psci_system_suspend_off = true;
+	return 0;
+}
+early_param("psci_no_system_suspend", psci_no_system_suspend);
+
 static void __init psci_init_system_suspend(void)
 {
 	int ret;
 
 	if (!IS_ENABLED(CONFIG_SUSPEND))
 		return;
+
+	if (psci_system_suspend_off) {
+		pr_info("SYSTEM_SUSPEND left out, suspend uses s2idle\n");
+		return;
+	}
 
 	ret = psci_features(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND));
 
