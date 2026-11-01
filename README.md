@@ -65,9 +65,13 @@ swap the kernel in (see "Using it in a ROM" below):
 
 - **Old sysfs paths.** SPMI devices keep their 5.4 names (`spmi0-02`), so
   the torch and the PMIC ADC keep their paths, permissions and labels.
-- **Scheduling.** The kernel schedules with PELT, EAS and `schedutil`. WALT
-  is built but turned off on the command line, so a 5.4 `post_boot` that
-  writes WALT's tunables finds its paths and changes nothing.
+- **Scheduling.** The kernel schedules with WALT, Qualcomm's own load
+  tracking, which the vendor perf HAL's boosts are made for. A 5.4
+  `post_boot` finds its WALT tunables in `/proc/sys/kernel` and its
+  `cpu_boost` nodes, `schedutil` is handed WALT's governor, core control
+  never pauses the big cores, and the boot boost ends on its own.
+  `sched_walt.disable=1` on the command line switches to PELT, EAS and
+  `schedutil` instead.
 - **Wi-Fi.** Runtime power management stays off whatever the ROM's
   `WCNSS_qcom_cfg.ini` says; with it on, a WCN6750 wake-up could reset the
   phone.
