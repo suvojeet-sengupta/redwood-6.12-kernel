@@ -1,0 +1,17 @@
+// SPDX-License-Identifier: BSD-3-Clause
+/*
+ * qcedev registers no IOMMU fault handler, so a context fault on its banks
+ * is a BUG() in arm-smmu and the phone resets. One hits the secure bank
+ * during DRM playback (FAR 0xff000000 on a fourth content buffer, playing
+ * JioHotstar in PiP). Log the fault and terminate the access instead.
+ */
+
+&qcom_cedev {
+	qcom_cedev_ns_cb {
+		qcom,iommu-faults = "non-fatal";
+	};
+
+	qcom_cedev_s_cb {
+		qcom,iommu-faults = "non-fatal";
+	};
+};
