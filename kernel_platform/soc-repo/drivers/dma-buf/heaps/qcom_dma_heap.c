@@ -45,6 +45,13 @@ static int qcom_dma_heap_probe(struct platform_device *pdev)
 				       QCOM_DMA_HEAP_FLAG_CP_PIXEL);
 		qcom_secure_system_heap_create("qcom,secure-non-pixel", NULL,
 				       QCOM_DMA_HEAP_FLAG_CP_NON_PIXEL);
+		/*
+		 * redwood: the 5.4 vendor Codec2 and OEMCrypto put secure
+		 * bitstreams in VMID_CP_BITSTREAM memory, the VMID of the
+		 * qcedev secure and video secure_bitstream context banks.
+		 */
+		qcom_secure_system_heap_create("qcom,secure-bitstream", NULL,
+				       QCOM_DMA_HEAP_FLAG_CP_BITSTREAM);
 	}
 	qcom_sys_movable_heap_create();
 
