@@ -47,6 +47,12 @@ Known issues:
   the power key: a panic reboots the phone after five seconds. A NULL
   dereference in `finish_task_switch()`, a 6.12.95 regression in the block
   layer's plug timestamp, is fixed.
+- **Heat and stutter.** `mi_thermald` capped the big cores down to
+  940 MHz as soon as its skin estimate passed 35 C, often just from
+  charging, and the UI stuttered. Its caps now stop at 1516.8 MHz on gold
+  and 1862.4 MHz on prime (`mi_thermal`'s `gold_limit_floor` and
+  `prime_limit_floor`, 0 for Xiaomi's own); the SoC's thermal limits and
+  the charging limits are unchanged.
 - **Upstream fixes.** AOSP `android16-6.12` proxy execution and
   blk-crypto fixes, Qualcomm display and kgsl (a6xx) fixes, and a bound on
   the battery driver's `verify_digest` copy.
