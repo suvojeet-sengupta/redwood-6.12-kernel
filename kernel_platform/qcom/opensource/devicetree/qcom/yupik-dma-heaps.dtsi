@@ -34,6 +34,8 @@
 			qcom,dma-heap-name = "qcom,qseecom";
 			qcom,dma-heap-type = <HEAP_TYPE_CMA>;
 			memory-region = <&qseecom_mem>;
+			/* Widevine's 5.4 ION HAL expects uncached qseecom buffers */
+			qcom,uncached-heap;
 		};
 
 		qcom,qseecom_ta {
