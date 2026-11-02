@@ -3523,34 +3523,34 @@ void generate_xm_charge_uvent(struct work_struct *work)
 #if defined(CONFIG_MI_WIRELESS)
 	/*add our prop start*/
 	reverse_chg_state_show(&(bcdev->battery_class), NULL, prop_buf);
-	strncpy(uevent_string[0] + 31, prop_buf, MAX_UEVENT_LENGTH - 31);
+	strscpy(uevent_string[0] + 31, prop_buf, MAX_UEVENT_LENGTH + 1 - 31);
 
 	reverse_chg_mode_show(&(bcdev->battery_class), NULL, prop_buf);
-	strncpy(uevent_string[1] + 30, prop_buf, MAX_UEVENT_LENGTH - 30);
+	strscpy(uevent_string[1] + 30, prop_buf, MAX_UEVENT_LENGTH + 1 - 30);
 
 	tx_mac_show(&(bcdev->battery_class), NULL, prop_buf);
-	strncpy(uevent_string[2] + 20, prop_buf, MAX_UEVENT_LENGTH - 20);
+	strscpy(uevent_string[2] + 20, prop_buf, MAX_UEVENT_LENGTH + 1 - 20);
 
 	rx_cep_show(&(bcdev->battery_class), NULL, prop_buf);
-	strncpy(uevent_string[3] + 20, prop_buf, MAX_UEVENT_LENGTH - 20);
+	strscpy(uevent_string[3] + 20, prop_buf, MAX_UEVENT_LENGTH + 1 - 20);
 
 	rx_cr_show(&(bcdev->battery_class), NULL, prop_buf);
-	strncpy(uevent_string[4] + 19, prop_buf, MAX_UEVENT_LENGTH - 19);
+	strscpy(uevent_string[4] + 19, prop_buf, MAX_UEVENT_LENGTH + 1 - 19);
 
 	wls_car_adapter_show(&(bcdev->battery_class), NULL, prop_buf);
-	strncpy(uevent_string[5] + 29, prop_buf, MAX_UEVENT_LENGTH - 29);
+	strscpy(uevent_string[5] + 29, prop_buf, MAX_UEVENT_LENGTH + 1 - 29);
 
 	soc_decimal_show(&(bcdev->battery_class), NULL, prop_buf);
-	strncpy(uevent_string[6] + 25, prop_buf, MAX_UEVENT_LENGTH - 25);
+	strscpy(uevent_string[6] + 25, prop_buf, MAX_UEVENT_LENGTH + 1 - 25);
 
 	soc_decimal_rate_show(&(bcdev->battery_class), NULL, prop_buf);
-	strncpy(uevent_string[7] + 30, prop_buf, MAX_UEVENT_LENGTH - 30);
+	strscpy(uevent_string[7] + 30, prop_buf, MAX_UEVENT_LENGTH + 1 - 30);
 
 	shutdown_delay_show(&(bcdev->battery_class), NULL, prop_buf);
-	strncpy(uevent_string[8] + 28, prop_buf, MAX_UEVENT_LENGTH - 28);
+	strscpy(uevent_string[8] + 28, prop_buf, MAX_UEVENT_LENGTH + 1 - 28);
 
 	vbus_disable_show(&(bcdev->battery_class), NULL, prop_buf);
-	strncpy(uevent_string[9] + 26, prop_buf, MAX_UEVENT_LENGTH - 26);
+	strscpy(uevent_string[9] + 26, prop_buf, MAX_UEVENT_LENGTH + 1 - 26);
 
 	dev_err(bcdev->dev,
 		"uevent test : %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n %s\n",
@@ -3558,16 +3558,16 @@ void generate_xm_charge_uvent(struct work_struct *work)
 		envp[7], envp[8], envp[9]);
 #else
 	soc_decimal_show(&(bcdev->battery_class), NULL, prop_buf);
-	strncpy(uevent_string[0] + 25, prop_buf, MAX_UEVENT_LENGTH - 25);
+	strscpy(uevent_string[0] + 25, prop_buf, MAX_UEVENT_LENGTH + 1 - 25);
 
 	soc_decimal_rate_show(&(bcdev->battery_class), NULL, prop_buf);
-	strncpy(uevent_string[1] + 30, prop_buf, MAX_UEVENT_LENGTH - 30);
+	strscpy(uevent_string[1] + 30, prop_buf, MAX_UEVENT_LENGTH + 1 - 30);
 
 	shutdown_delay_show(&(bcdev->battery_class), NULL, prop_buf);
-	strncpy(uevent_string[2] + 28, prop_buf, MAX_UEVENT_LENGTH - 28);
+	strscpy(uevent_string[2] + 28, prop_buf, MAX_UEVENT_LENGTH + 1 - 28);
 
 	vbus_disable_show(&(bcdev->battery_class), NULL, prop_buf);
-	strncpy(uevent_string[3] + 26, prop_buf, MAX_UEVENT_LENGTH - 26);
+	strscpy(uevent_string[3] + 26, prop_buf, MAX_UEVENT_LENGTH + 1 - 26);
 
 	dev_dbg(bcdev->dev, "uevent test : %s\n %s\n %s\n %s\n", envp[0],
 		envp[1], envp[2], envp[3]);
