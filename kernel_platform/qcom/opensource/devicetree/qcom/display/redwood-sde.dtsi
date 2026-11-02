@@ -389,6 +389,8 @@
 		memory-region = <&sde_sec_iommu_region>;
 		qcom,iommu-faults = "non-fatal";
 		qcom,iommu-vmid = <0xa>;
+		clocks = <&dispcc DISP_CC_MDSS_MDP_CLK>;
+		clock-names = "mdp_core_clk";
 
 		sde_sec_iommu_region: sde-sec-iommu-region {
 			iommu-addresses = <&smmu_sde_sec 0x0 0x20000>;
