@@ -22,11 +22,26 @@ struct io_pgtable_pool {
 static DEFINE_MUTEX(page_pool_xa_lock);
 static DEFINE_XARRAY(page_pool_xa);
 static atomic_long_t page_pool_count = ATOMIC_LONG_INIT(0);
+/* Pages in secure pools, which the shrinker leaves alone. */
+static atomic_long_t secure_pool_count = ATOMIC_LONG_INIT(0);
 
 static bool is_secure_vmid(u32 vmid)
 {
 	return !!vmid;
 }
+
+/*
+ * redwood: sharing a page table page with a secure VM one page at a time, from the
+ * map path, can stop the firmware: with DRM playback running, a MEM_ASSIGN of a new
+ * page for the video decoder's secure banks never returns and the phone resets. Give
+ * every secure VMID's pool its pages up front, in a few large assigns while its
+ * domain is set up at boot, and never hand them back from the shrinker.
+ */
+static unsigned int secure_pool_pages = 1024;
+module_param(secure_pool_pages, uint, 0444);
+MODULE_PARM_DESC(secure_pool_pages, "Page table pages assigned up front per secure VMID");
+
+#define SECURE_POOL_CHUNK_ORDER	8
 
 static int io_pgtable_hyp_assign_page(u32 vmid, struct page *page)
 {
@@ -65,6 +80,21 @@ static int io_pgtable_hyp_unassign_page(u32 vmid, struct page *page)
 	return ret ? -EADDRNOTAVAIL : 0;
 }
 
+static int io_pgtable_hyp_assign_range(u32 vmid, phys_addr_t addr, size_t size)
+{
+	struct qcom_scm_vmperm dst_vmids[] = {{QCOM_SCM_VMID_HLOS,
+					       PERM_READ | PERM_WRITE},
+					      {vmid, PERM_READ}};
+	u64 src_vmid_list = BIT(QCOM_SCM_VMID_HLOS);
+	int ret;
+
+	ret = qcom_scm_assign_mem(addr, size, &src_vmid_list, dst_vmids, ARRAY_SIZE(dst_vmids));
+	if (ret)
+		pr_err("failed qcom_assign for %pa size %zx - subsys VMid %u rc:%d\n",
+		       &addr, size, vmid, ret);
+	return ret;
+}
+
 static struct page *__alloc_page_from_pool(struct list_head *page_pool)
 {
 	struct page *page;
@@ -73,6 +103,8 @@ static struct page *__alloc_page_from_pool(struct list_head *page_pool)
 	if (page) {
 		list_del(&page->lru);
 		atomic_long_dec(&page_pool_count);
+		if (is_secure_vmid(page_private(page)))
+			atomic_long_dec(&secure_pool_count);
 		dec_node_page_state(page, NR_KERNEL_MISC_RECLAIMABLE);
 	}
 
@@ -102,8 +134,43 @@ static void free_page_to_pool(struct page *page)
 	spin_lock_irqsave(&pool->pool_lock, flags);
 	list_add(&page->lru, &pool->page_pool);
 	atomic_long_inc(&page_pool_count);
+	if (is_secure_vmid(vmid))
+		atomic_long_inc(&secure_pool_count);
 	inc_node_page_state(page, NR_KERNEL_MISC_RECLAIMABLE);
 	spin_unlock_irqrestore(&pool->pool_lock, flags);
+}
+
+/* Fill a new secure pool with pages already shared with @pool->vmid. */
+static void io_pgtable_pool_prefill(struct io_pgtable_pool *pool)
+{
+	unsigned int chunk = 1U << SECURE_POOL_CHUNK_ORDER, done = 0, i;
+	unsigned long flags;
+	struct page *page;
+
+	while (done < secure_pool_pages) {
+		page = __iommu_alloc_pages(GFP_KERNEL | __GFP_NOWARN, SECURE_POOL_CHUNK_ORDER);
+		if (!page)
+			break;
+		/* The pages may be inaccessible if this fails, so leak them. */
+		if (io_pgtable_hyp_assign_range(pool->vmid, page_to_phys(page),
+						PAGE_SIZE << SECURE_POOL_CHUNK_ORDER))
+			break;
+
+		split_page(page, SECURE_POOL_CHUNK_ORDER);
+		spin_lock_irqsave(&pool->pool_lock, flags);
+		for (i = 0; i < chunk; i++) {
+			set_page_private(page + i, (unsigned long)pool->vmid);
+			list_add(&page[i].lru, &pool->page_pool);
+			atomic_long_inc(&page_pool_count);
+			atomic_long_inc(&secure_pool_count);
+			inc_node_page_state(page + i, NR_KERNEL_MISC_RECLAIMABLE);
+		}
+		spin_unlock_irqrestore(&pool->pool_lock, flags);
+		done += chunk;
+	}
+
+	pr_info("io-pgtable: %u page table pages assigned up front for VMID %u\n",
+		done, pool->vmid);
 }
 
 /* Assumes that page_pool_xa_lock is held. */
@@ -166,6 +233,8 @@ int qcom_io_pgtable_allocator_register(u32 vmid)
 	ret = xa_err(xa_store(&page_pool_xa, vmid, pool, GFP_KERNEL));
 	if (ret < 0)
 		kfree(pool);
+	else if (is_secure_vmid(vmid))
+		io_pgtable_pool_prefill(pool);
 out:
 	mutex_unlock(&page_pool_xa_lock);
 	return ret;
@@ -219,6 +288,10 @@ struct page *qcom_io_pgtable_alloc_page(u32 vmid, gfp_t gfp)
 	if (page)
 		return page;
 
+	if (is_secure_vmid(vmid))
+		pr_warn_once("io-pgtable: VMID %u pool is empty, assigning page table pages one by one\n",
+			     vmid);
+
 	page = __iommu_alloc_pages(gfp, 0);
 	if (!page)
 		return NULL;
@@ -250,7 +323,8 @@ EXPORT_SYMBOL(qcom_io_pgtable_free_page);
 static unsigned long io_pgtable_alloc_count_objects(struct shrinker *shrinker,
 						    struct shrink_control *sc)
 {
-	unsigned long count = atomic_long_read(&page_pool_count);
+	unsigned long count = atomic_long_read(&page_pool_count) -
+			      atomic_long_read(&secure_pool_count);
 
 	return count ? count : SHRINK_EMPTY;
 }
@@ -288,6 +362,9 @@ static unsigned long io_pgtable_alloc_scan_objects(struct shrinker *shrinker,
 
 	mutex_lock(&page_pool_xa_lock);
 	xa_for_each(&page_pool_xa, index, pool) {
+		/* Secure pools keep their pages: unassigning one is a MEM_ASSIGN too. */
+		if (is_secure_vmid(pool->vmid))
+			continue;
 		count += scan_page_pool(pool, &freelist, nr_to_scan - count);
 		if (count >= nr_to_scan)
 			break;
