@@ -4910,10 +4910,16 @@ find_get_context(struct task_struct *task, struct perf_event *event)
 	int err;
 
 	if (!task) {
-		/* Must be root to operate on a CPU event: */
-		err = perf_allow_cpu(&event->attr);
-		if (err)
-			return ERR_PTR(err);
+		/*
+		 * Must be root to operate on a CPU event. The kernel's own
+		 * counters are exempt: SELinux denies them once policy is
+		 * loaded, so memlat loses its counters at the first CPU hotplug.
+		 */
+		if (!is_kernel_event(event)) {
+			err = perf_allow_cpu(&event->attr);
+			if (err)
+				return ERR_PTR(err);
+		}
 
 		cpuctx = per_cpu_ptr(&perf_cpu_context, event->cpu);
 		ctx = &cpuctx->ctx;
