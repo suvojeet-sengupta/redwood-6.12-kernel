@@ -1050,7 +1050,11 @@ static int configure_hwmon_node(struct bw_hwmon *hwmon)
 
 	node->guard_band_mbps = 100;
 	node->decay_rate = 90;
-	node->io_percent = 16;
+	/*
+	 * The vote is the measured bandwidth * 100 / io_percent. 16 asks for
+	 * 6.25 times what was measured; redwood's 5.4 post_boot used 68 for DDR.
+	 */
+	node->io_percent = hwmon->dcvs_hw == DCVS_DDR ? 68 : 16;
 	node->bw_step = 190;
 	node->sample_ms = 50;
 	node->window_ms = 50;
