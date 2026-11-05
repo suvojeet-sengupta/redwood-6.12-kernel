@@ -8,7 +8,7 @@ ship with) moved onto redwood, which came with a 5.4 kernel. It runs the
 normal 5.4-era vendor and firmware of the phone, so most of the work here is
 making the new kernel speak the way the old vendor blobs expect.
 
-The current release is **Suvkernel 3.0** (`6.12.97-Suvkernel-3.0`):
+The current release is **Suvkernel 3.1** (`6.12.97-Suvkernel-3.1`):
 Qualcomm's `KERNEL.PLATFORM.5.0` with Google's `android16-6.12` (Linux
 6.12.97) merged in.
 
@@ -150,35 +150,95 @@ one says why in its message: `git log` is the best documentation here.
 
 ## Building
 
-This repository has the sources only. The build system and compilers come
-from Qualcomm's manifest for the same release:
+Run these in order on Linux. Both this repository and the scripts in
+[redwood-6.12](https://github.com/suvojeet-sengupta/redwood-6.12) are private,
+so log in first with an account that can read them (`gh auth login`, then
+`gh auth setup-git`).
 
-```
-git clone https://github.com/suvojeet-sengupta/redwood-6.12-kernel
-mkdir kp && cd kp
-repo init -u https://git.codelinaro.org/clo/la/kernelplatform/manifest.git \
-	-b release -m KERNEL.PLATFORM.5.0.r48-00400-kernel.0.xml --depth=1
-repo sync -c -j8 --no-tags --no-clone-bundle
-cd kernel_platform
-for x in bootable build build_with_bazel.py common-modules device.bazelrc \
-		external MODULE.bazel prebuilts system tools WORKSPACE \
-		WORKSPACE.bzlmod .source_date_epoch_dir; do
-	mv $x ../../redwood-6.12-kernel/kernel_platform/
-	echo kernel_platform/$x >> ../../redwood-6.12-kernel/.git/info/exclude
-done
+**1. Install the tools.** On Debian or Ubuntu:
+
+```bash
+sudo apt install -y git python3 curl lz4 cpio zip kmod binutils
 ```
 
-Keep `common`, `qcom` and `soc-repo` from this repository. The scripts that
-build everything (kernel, vendor modules, `dtbo.img`) and pack it for the
-ROM or as a flashable zip are in
-[redwood-6.12](https://github.com/suvojeet-sengupta/redwood-6.12).
+```bash
+mkdir -p ~/.bin && curl -fsS https://storage.googleapis.com/git-repo-downloads/repo -o ~/.bin/repo && chmod +x ~/.bin/repo
+```
+
+```bash
+export PATH=~/.bin:$PATH
+```
+
+**2. Get the sources.** They must be in these two paths:
+
+```bash
+git clone https://github.com/suvojeet-sengupta/redwood-6.12-kernel ~/redwood-6.12-kernel
+```
+
+```bash
+git clone https://github.com/suvojeet-sengupta/redwood-6.12 ~/redwood-6.12
+```
+
+**3. Add the build system and compilers** from Qualcomm's manifest. `common`,
+`qcom` and `soc-repo` stay from this repository:
+
+```bash
+mkdir -p ~/kp && cd ~/kp && repo init -u https://git.codelinaro.org/clo/la/kernelplatform/manifest.git -b release -m KERNEL.PLATFORM.5.0.r48-00400-kernel.0.xml --depth=1 && repo sync -c -j8 --no-tags --no-clone-bundle
+```
+
+```bash
+cd ~/kp/kernel_platform && for x in bootable build build_with_bazel.py common-modules device.bazelrc external MODULE.bazel prebuilts system tools WORKSPACE WORKSPACE.bzlmod .source_date_epoch_dir; do mv $x ~/redwood-6.12-kernel/kernel_platform/ && echo kernel_platform/$x >> ~/redwood-6.12-kernel/.git/info/exclude; done
+```
+
+**4. Get your ROM's images.** The build and the zip reuse their ramdisks and
+command line. Take them from a rooted phone running that ROM, or copy `boot.img`
+and `vendor_boot.img` from the ROM's own files to `~/rom`:
+
+```bash
+mkdir -p ~/rom && adb shell 'su -c "for p in boot vendor_boot; do dd if=/dev/block/by-name/\$p\$(getprop ro.boot.slot_suffix) of=/sdcard/\$p.img; done"' && adb pull /sdcard/boot.img ~/rom/ && adb pull /sdcard/vendor_boot.img ~/rom/
+```
+
+```bash
+bash ~/redwood-6.12/scripts/setup-work.sh ~/rom/boot.img ~/rom/vendor_boot.img
+```
+
+**5. Build the kernel, modules and `dtbo.img`:**
+
+```bash
+bash ~/work/build-all.sh
+```
+
+It stops at the first stage that fails and names it. To restart from that stage,
+for example `stage2`:
+
+```bash
+FROM=stage2 bash ~/work/build-all.sh
+```
+
+The kernel is in
+`~/redwood-6.12-kernel/kernel_platform/out/msm-kernel-lahaina-perf/dist/Image`
+and the overlay image is `~/work/dtfast/dtbo.img`.
+
+**6. Make what you want to flash.** For an AnyKernel3 zip, written to
+`~/work/zip/Suvkernel-<version>-redwood-<date>.zip`:
+
+```bash
+bash ~/redwood-6.12/scripts/make-zip.sh ~/rom/boot.img ~/rom/vendor_boot.img
+```
+
+For plain images instead, written to `~/work/android/rom612/`:
+
+```bash
+bash ~/redwood-6.12/scripts/pack-rom612.sh ~/rom/boot.img ~/rom/vendor_boot.img
+```
 
 ## Installing
 
-- **Flashable zip.** Each release has an AnyKernel3 zip
-  (`Suvkernel-<version>-redwood-*.zip`) that flashes from recovery. It replaces
-  the kernel, the modules in `vendor_boot` and `dtbo`, and keeps the boot
-  ramdisk, so KernelSU or Magisk stay installed.
+- **Flashable zip.** `make-zip.sh` makes an AnyKernel3 zip that flashes from
+  recovery. It replaces the kernel, `dtbo` and all of `vendor_boot`, and keeps
+  the boot ramdisk, so KernelSU or Magisk stay installed. Its `vendor_boot` comes
+  from the images you gave it, so flash it only on that same ROM build. Keep a
+  backup of all three partitions first.
 - **In a ROM.** Don't build the kernel inside the ROM. The ready-made
   kernel, modules and `dtbo.img` are in
   [device_xiaomi_redwood-kernel-6.12](https://github.com/suvojeet-sengupta/device_xiaomi_redwood-kernel-6.12),
