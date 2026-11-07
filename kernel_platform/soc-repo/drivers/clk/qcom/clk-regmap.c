@@ -207,12 +207,12 @@ int clk_prepare_regmap(struct clk_hw *hw)
 	if (vdd_level < 0)
 		return vdd_level;
 
-	if (rclk->vdd_data.vdd_level == 0)
+	/*
+	 * The rate may have changed while the clock was unprepared without
+	 * updating the vote, so vote for what the current rate needs.
+	 */
+	if (vdd_level > rclk->vdd_data.vdd_level)
 		rclk->vdd_data.vdd_level = vdd_level;
-
-	WARN(vdd_level > rclk->vdd_data.vdd_level,
-	     "%s level:%d > vdd_level:%d\n", clk_hw_get_name(hw),
-	     vdd_level, rclk->vdd_data.vdd_level);
 
 	return clk_vote_vdd_level(&rclk->vdd_data, rclk->vdd_data.vdd_level);
 }
