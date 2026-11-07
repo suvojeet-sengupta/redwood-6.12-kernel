@@ -30,7 +30,7 @@ struct subsys {
 	struct cdev cdev;
 	struct mutex lock;
 	int users;
-	bool booted;		/* booted by autoboot, held for good */
+	bool booted;		/* recovery on, and booted if autoboot; held for good */
 	int tries;
 };
 
@@ -165,20 +165,25 @@ static void subsys_boot_work(struct work_struct *work)
 		struct subsys *s = &subsystems[i];
 		struct rproc *rproc;
 
-		if (!s->autoboot || s->booted)
+		if (s->booted)
 			continue;
+		/*
+		 * Look every processor up, not only the ones booted here:
+		 * subsys_rproc() turns recovery on, which stays off otherwise,
+		 * so a WPSS or modem crash took the whole phone down.
+		 */
 		rproc = subsys_rproc(s);
-		if (!rproc || ++s->tries > 60) {
-			again |= !rproc && s->tries <= 60;
+		if (!rproc) {
+			again |= ++s->tries <= 60;
 			continue;
 		}
-		if (rproc->state == RPROC_RUNNING) {
+		if (!s->autoboot || rproc->state == RPROC_RUNNING) {
 			s->booted = true;
 			continue;
 		}
 		ret = rproc_boot(rproc);
 		if (ret) {
-			again = true;
+			again |= ++s->tries <= 60;
 			continue;
 		}
 		s->booted = true;
