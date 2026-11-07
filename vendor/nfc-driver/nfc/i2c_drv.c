@@ -44,7 +44,6 @@
 #include <linux/delay.h>
 #include <linux/uaccess.h>
 #include <linux/gpio.h>
-#include <linux/hwid.h>
 #ifdef CONFIG_COMPAT
 #include <linux/compat.h>
 #endif
@@ -360,11 +359,6 @@ int nfc_i2c_dev_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	struct platform_configs *nfc_configs = NULL;
 	struct platform_gpio *nfc_gpio = NULL;
 	pr_debug("NxpDrv: %s: enter\n", __func__);
-	/* The Indian variant has no NFC controller: stay bound without a node, so the unused supply can still turn off */
-	if (get_hw_country_version() == CountryIndia) {
-		pr_info("NxpDrv: %s: no NFC controller on this variant\n", __func__);
-		return 0;
-	}
 	nfc_dev = kzalloc(sizeof(struct nfc_dev), GFP_KERNEL);
 	if (nfc_dev == NULL) {
 		ret = -ENOMEM;
@@ -454,7 +448,31 @@ int nfc_i2c_dev_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	}
 #else
 	nfc_dev->secure_zone = false;
-	nfc_post_init(nfc_dev);
+	ret = nfc_post_init(nfc_dev);
+	if (ret) {
+		/*
+		 * No controller answered: redwood's Indian variant has none.
+		 * Stay bound without a node and give the supply back, so it
+		 * can turn off and its provider settles.
+		 */
+		pr_info("NxpDrv: %s: no NFC controller found (%d)\n", __func__, ret);
+		if (nfc_dev->reg) {
+			if (nfc_dev->is_vreg_enabled)
+				nfc_ldo_unvote(nfc_dev);
+			regulator_put(nfc_dev->reg);
+		}
+		free_irq(client->irq, nfc_dev);
+		nfc_misc_unregister(nfc_dev, DEV_COUNT);
+		mutex_destroy(&nfc_dev->dev_ref_mutex);
+		mutex_destroy(&nfc_dev->read_mutex);
+		mutex_destroy(&nfc_dev->write_mutex);
+		/* nfc_post_init() already gave back the VEN and download pins */
+		gpio_free(nfc_gpio->irq);
+		kfree(nfc_dev->write_kbuf);
+		kfree(nfc_dev->read_kbuf);
+		kfree(nfc_dev);
+		return 0;
+	}
 #endif
 	device_init_wakeup(&client->dev, true);
 	i2c_set_clientdata(client, nfc_dev);

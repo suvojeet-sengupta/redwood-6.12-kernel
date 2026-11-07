@@ -1,4 +1,4 @@
-ccflags-y += -I$(srctree)/techpack/nfc/include/uapi/linux/nfc
+ccflags-y += -I$(src)/include/uapi/linux/nfc
 
 obj-$(CONFIG_NXP_NFC_I2C) += nxp-nci.o
 nxp-nci-y := nfc/ese_cold_reset.o nfc/common.o nfc/common_nxp.o nfc/common_qcom.o nfc/i2c_drv.o
