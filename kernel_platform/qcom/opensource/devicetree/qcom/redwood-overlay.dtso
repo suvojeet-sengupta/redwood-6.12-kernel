@@ -27,6 +27,7 @@
 #include "redwood-fingerprint.dtsi"
 #include "redwood-haptics.dtsi"
 #include "redwood-ir.dtsi"
+#include "redwood-nfc.dtsi"
 #include "redwood-crypto.dtsi"
 #include "redwood-thermal.dtsi"
 #include "redwood-touchfeature.dtsi"
