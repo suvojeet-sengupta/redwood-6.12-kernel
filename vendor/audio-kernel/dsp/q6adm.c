@@ -2583,7 +2583,7 @@ static void send_adm_cal_type(int fedai_id, int cal_index, int path, int port_id
 		this_adm.fnn_port_id = port_id;
 		this_adm.fnn_copp_idx = copp_idx;
 
-		pr_err("%s fnn_app_type = 0x%x, fnn_port_id = 0x%x, fnn_copp_idx=0x%x\n", __func__,
+		pr_debug("%s fnn_app_type = 0x%x, fnn_port_id = 0x%x, fnn_copp_idx=0x%x\n", __func__,
 				this_adm.fnn_app_type, this_adm.fnn_port_id, this_adm.fnn_copp_idx);
 
 		pr_debug("%s: qcom_scm_assign_mem success in tx_port_id 0x%x\n",
