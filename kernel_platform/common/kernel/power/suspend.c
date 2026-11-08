@@ -210,6 +210,16 @@ static int __init mem_sleep_default_setup(char *str)
 }
 __setup("mem_sleep_default=", mem_sleep_default_setup);
 
+static bool mem_sleep_s2idle_only __ro_after_init;
+
+static int __init mem_sleep_s2idle_only_setup(char *str)
+{
+	mem_sleep_s2idle_only = true;
+	mem_sleep_default = PM_SUSPEND_TO_IDLE;
+	return 0;
+}
+early_param("mem_sleep_s2idle_only", mem_sleep_s2idle_only_setup);
+
 /**
  * suspend_set_ops - Set the global suspend method table.
  * @ops: Suspend operations to use.
@@ -228,7 +238,7 @@ void suspend_set_ops(const struct platform_suspend_ops *ops)
 		if (mem_sleep_default == PM_SUSPEND_STANDBY)
 			mem_sleep_current = PM_SUSPEND_STANDBY;
 	}
-	if (valid_state(PM_SUSPEND_MEM)) {
+	if (valid_state(PM_SUSPEND_MEM) && !mem_sleep_s2idle_only) {
 		mem_sleep_states[PM_SUSPEND_MEM] = mem_sleep_labels[PM_SUSPEND_MEM];
 		if (mem_sleep_default >= PM_SUSPEND_MEM)
 			mem_sleep_current = PM_SUSPEND_MEM;
