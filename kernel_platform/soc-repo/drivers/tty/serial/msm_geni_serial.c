@@ -3376,7 +3376,12 @@ static void msm_geni_serial_start_tx(struct uart_port *uport)
 			msm_port->uart_kpi_tx[msm_port->kpi_idx].xfer_req_sw.time_stamp =
 									sched_clock();
 		}
-		if (msm_geni_serial_prep_dma_tx(uport) == -EPERM) {
+		/*
+		 * No DMA started (nothing to send, a flush pending or the map
+		 * failed): no Tx done will drop the vote taken above, so drop
+		 * it here.
+		 */
+		if (msm_geni_serial_prep_dma_tx(uport)) {
 			UART_LOG_DBG(msm_port->ipc_log_tx, uport->dev, "%s: tx_en=0,\n",
 				     __func__);
 			goto exit_start_tx;
@@ -4212,20 +4217,26 @@ static int msm_geni_serial_handle_dma_tx(struct uart_port *uport)
 
 	msm_port->xmit_size = 0;
 
-	if (!kfifo_is_empty(&tport->xmit_fifo))
-		msm_geni_serial_prep_dma_tx(uport);
-	else {
-		/*
-		 * This will balance out the power vote put in during start_tx
-		 * allowing the device to suspend.
-		 */
-		if (!uart_console(uport)) {
-			UART_LOG_DBG(msm_port->ipc_log_misc, uport->dev,
-				"%s.Tx sent out, Power off\n", __func__);
-			msm_geni_serial_power_off(uport);
-		}
-		uart_write_wakeup(uport);
+	/*
+	 * A started DMA keeps the start_tx vote until its own Tx done. If none
+	 * starts (a flush landed after this transfer finished, so the next
+	 * prep returns -EIO, or the map failed), nothing else would drop it:
+	 * the UART stayed resumed and held its wakeup source until reboot.
+	 */
+	if (!kfifo_is_empty(&tport->xmit_fifo) &&
+	    !msm_geni_serial_prep_dma_tx(uport))
+		return 0;
+
+	/*
+	 * This will balance out the power vote put in during start_tx
+	 * allowing the device to suspend.
+	 */
+	if (!uart_console(uport)) {
+		UART_LOG_DBG(msm_port->ipc_log_misc, uport->dev,
+			"%s.Tx sent out, Power off\n", __func__);
+		msm_geni_serial_power_off(uport);
 	}
+	uart_write_wakeup(uport);
 	return 0;
 }
 
