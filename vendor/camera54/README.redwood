@@ -1,0 +1,4 @@
+The 5.4 lahaina camera driver (techpack/camera) that redwood's 5.4 CamX
+userspace and ICP firmware speak to. redwood-6.12/scripts/build-camera54.sh
+ports and builds it for 6.12 (modules/camera54). It came from
+LineageOS/android_kernel_xiaomi_sm8350 lineage-24.0 at 2c0d4b8372fd7d9648f2ff140130387efe200b0f.
