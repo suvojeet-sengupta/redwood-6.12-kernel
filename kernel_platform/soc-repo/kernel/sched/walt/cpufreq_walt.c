@@ -11,6 +11,7 @@
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/kthread.h>
+#include <soc/qcom/socinfo.h>
 #include <trace/events/power.h>
 
 #include "walt.h"
@@ -951,6 +952,35 @@ void set_default_zone_util_pct_values(struct waltgov_tunables *tunables,
 
 int cluster_zones_initialized[MAX_CLUSTERS];
 
+/*
+ * redwood (SM7325): run light and medium load close to the speed it needs,
+ * 95% target load up to the mid frequency and 90% up to the smart freq cap,
+ * instead of the 80% (25% headroom) WALT uses at every level. Heavier load
+ * keeps 80%.
+ */
+static const int redwood_zone_khz[][2] = {
+	{ 1152000, 1516800 },	/* silver */
+	{ 1228800, 1900800 },	/* gold */
+	{ 1324800, 1862400 },	/* prime */
+};
+
+static void waltgov_redwood_zones(struct waltgov_tunables *tunables,
+				  struct waltgov_policy *wg_policy)
+{
+	const char *soc = socinfo_get_id_string();
+	int id = cpu_cluster(wg_policy->policy->cpu)->id;
+
+	if (!soc || strcmp(soc, "SM7325") || id >= ARRAY_SIZE(redwood_zone_khz))
+		return;
+
+	tunables->zone_util_pct[0][0] = redwood_zone_khz[id][0];
+	tunables->zone_util_pct[0][1] = 95;
+	tunables->zone_util_pct[1][0] = redwood_zone_khz[id][1];
+	tunables->zone_util_pct[1][1] = 90;
+	update_util_inflate_factor(tunables, wg_policy);
+	cluster_zones_initialized[id] = 1;
+}
+
 static ssize_t zone_max_util_pct_show(struct gov_attr_set *attr_set, char *buf)
 {
 	struct waltgov_tunables *tunables = to_waltgov_tunables(attr_set);
@@ -1421,6 +1451,7 @@ static int waltgov_init(struct cpufreq_policy *policy)
 			-1, sizeof(tunables->zone_util_pct));
 
 	memset(wg_policy->zone_util, -1, sizeof(wg_policy->zone_util));
+	waltgov_redwood_zones(tunables, wg_policy);
 
 	if (is_min_possible_cluster_cpu(policy->cpu))
 		tunables->rtg_boost_freq = DEFAULT_SILVER_RTG_BOOST_FREQ;
