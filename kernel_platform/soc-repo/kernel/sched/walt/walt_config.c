@@ -34,6 +34,7 @@ static void walt_config_redwood(void)
 {
 	static const unsigned int up_pct[] = { 71, 95 };
 	static const unsigned int dn_pct[] = { 65, 85 };
+	static const unsigned int smart_cap_khz[] = { 1516800, 1900800, 1862400 };
 	struct walt_sched_cluster *cluster;
 	int i = 0;
 
@@ -61,6 +62,32 @@ static void walt_config_redwood(void)
 	/* 5.4: input_boost_freq "0:1324800", input_boost_ms 120 */
 	sysctl_input_boost_freq[0] = 1324800;
 	sysctl_input_boost_ms = 120;
+
+	/*
+	 * Smart freq: keep short bursts and light load off the top OPPs,
+	 * which cost the most voltage for the least work. Sustained load
+	 * near the cap, a launch or full throttle boost, many big tasks or
+	 * thermal rotation lift the cap to fmax.
+	 */
+	i = 0;
+	for_each_sched_cluster(cluster) {
+		struct smart_freq_cluster_info *sf = cluster->smart_freq_info;
+
+		if (i >= ARRAY_SIZE(smart_cap_khz))
+			break;
+		sf->legacy_reason_config[NO_REASON_SMART_FREQ].freq_allowed =
+			smart_cap_khz[i];
+		sf->legacy_reason_config[SUSTAINED_HIGH_UTIL_SMART_FREQ].hyst_ns =
+			NSEC_PER_SEC;
+		sf->legacy_reason_config[BIG_TASKCNT_SMART_FREQ].hyst_ns =
+			NSEC_PER_SEC;
+		sf->smart_freq_participation_mask |=
+			BIT(BOOST_SMART_FREQ) |
+			BIT(SUSTAINED_HIGH_UTIL_SMART_FREQ) |
+			BIT(BIG_TASKCNT_SMART_FREQ) |
+			BIT(THERMAL_ROTATION_SMART_FREQ);
+		i++;
+	}
 }
 
 void walt_config(void)
