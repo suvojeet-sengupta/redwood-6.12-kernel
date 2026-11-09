@@ -61,6 +61,8 @@ static void walt_config_redwood(void)
 
 	/* 5.4: input_boost_freq "0:1324800", input_boost_ms 120 */
 	sysctl_input_boost_freq[0] = 1324800;
+	/* gold, where the UI thread usually runs: its hispeed for the first frame */
+	sysctl_input_boost_freq[4] = 1228800;
 	sysctl_input_boost_ms = 120;
 
 	/*

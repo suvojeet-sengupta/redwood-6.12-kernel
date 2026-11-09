@@ -954,9 +954,9 @@ int cluster_zones_initialized[MAX_CLUSTERS];
 
 /*
  * redwood (SM7325): run light and medium load close to the speed it needs,
- * 95% target load up to the mid frequency and 90% up to the smart freq cap,
+ * 90% target load up to the mid frequency and 85% up to the smart freq cap,
  * instead of the 80% (25% headroom) WALT uses at every level. Heavier load
- * keeps 80%.
+ * keeps 80%. 95/90 left UI bursts too little headroom.
  */
 static const int redwood_zone_khz[][2] = {
 	{ 1152000, 1516800 },	/* silver */
@@ -974,9 +974,9 @@ static void waltgov_redwood_zones(struct waltgov_tunables *tunables,
 		return;
 
 	tunables->zone_util_pct[0][0] = redwood_zone_khz[id][0];
-	tunables->zone_util_pct[0][1] = 95;
+	tunables->zone_util_pct[0][1] = 90;
 	tunables->zone_util_pct[1][0] = redwood_zone_khz[id][1];
-	tunables->zone_util_pct[1][1] = 90;
+	tunables->zone_util_pct[1][1] = 85;
 	update_util_inflate_factor(tunables, wg_policy);
 	cluster_zones_initialized[id] = 1;
 }
