@@ -3968,7 +3968,9 @@ void reg_dmav1_setup_dma_igcv5(struct sde_hw_pipe *ctx, void *cfg,
 		return;
 	}
 
-	if (hw_cfg->len != sizeof(struct drm_msm_igc_lut)) {
+	/* 5.4 userspace sends the struct without the *_extended tables */
+	if (hw_cfg->len != sizeof(struct drm_msm_igc_lut) &&
+	    hw_cfg->len != offsetof(struct drm_msm_igc_lut, c0_extended)) {
 		DRM_ERROR("invalid size of payload len %d exp %zd\n",
 				hw_cfg->len, sizeof(struct drm_msm_igc_lut));
 		return;
@@ -4134,7 +4136,9 @@ void reg_dmav1_setup_dma_gcv5(struct sde_hw_pipe *ctx, void *cfg,
 		return;
 	}
 
-	if (hw_cfg->len != sizeof(struct drm_msm_pgc_lut)) {
+	/* 5.4 userspace sends the struct without the *_extended tables */
+	if (hw_cfg->len != sizeof(struct drm_msm_pgc_lut) &&
+	    hw_cfg->len != offsetof(struct drm_msm_pgc_lut, c0_extended)) {
 		DRM_ERROR("invalid size of payload len %d exp %zd\n",
 				hw_cfg->len, sizeof(struct drm_msm_pgc_lut));
 		return;
