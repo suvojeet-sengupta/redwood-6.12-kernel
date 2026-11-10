@@ -1400,6 +1400,17 @@ static int battery_psy_get_prop(struct power_supply *psy,
 		return prop_id;
 
 	rc = read_property_id(bcdev, pst, prop_id);
+	if (rc == -ENODATA && prop == POWER_SUPPLY_PROP_CURRENT_AVG) {
+		/*
+		 * redwood's ADSP keeps no average current. The health HAL
+		 * reads current_avg for BatteryManager's CURRENT_AVERAGE, so
+		 * give it the instant current instead of an error.
+		 */
+		prop_id = get_property_id(pst, POWER_SUPPLY_PROP_CURRENT_NOW);
+		if (prop_id < 0)
+			return prop_id;
+		rc = read_property_id(bcdev, pst, prop_id);
+	}
 	if (rc < 0)
 		return rc;
 
