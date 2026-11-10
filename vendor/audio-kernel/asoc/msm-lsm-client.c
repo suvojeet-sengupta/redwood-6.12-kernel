@@ -2103,7 +2103,6 @@ enum {
 		_IOWR('U', 0x14, struct lsm_params_get_info_32),
 };
 
-#if IS_ENABLED(CONFIG_AUDIO_QGKI)
 static int msm_lsm_ioctl_compat(struct snd_pcm_substream *substream,
 			  unsigned int cmd, void __user *arg)
 {
@@ -2612,7 +2611,6 @@ done:
 	mutex_unlock(&prtd->lsm_api_lock);
 	return err;
 }
-#endif /* CONFIG_AUDIO_QGKI */
 #else
 #define msm_lsm_ioctl_compat NULL
 #endif
@@ -2631,7 +2629,12 @@ static int msm_lsm_ioctl(struct snd_soc_component *component, struct snd_pcm_sub
 			(!substream) ? "substream" : "private_data");
 		return -EINVAL;
 	}
-	pr_err("%s Entered for cmd : %d\n", __func__, cmd);
+	pr_debug("%s: cmd 0x%x\n", __func__, cmd);
+#ifdef CONFIG_COMPAT
+	/* 32-bit HALs reach here through the PCM core's compat ioctl */
+	if (in_compat_syscall() && _IOC_TYPE(cmd) == 'U')
+		return msm_lsm_ioctl_compat(substream, cmd, arg);
+#endif
 	runtime = substream->runtime;
 	prtd = runtime->private_data;
 	rtd = substream->private_data;
