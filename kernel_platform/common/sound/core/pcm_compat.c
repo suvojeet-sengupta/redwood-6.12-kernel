@@ -642,5 +642,7 @@ static long snd_pcm_ioctl_compat(struct file *file, unsigned int cmd, unsigned l
 #endif /* CONFIG_X86_X32_ABI */
 	}
 
+	if (_IOC_TYPE(cmd) == 'U' && substream->ops->ioctl)
+		return substream->ops->ioctl(substream, cmd, (void __force *)argp);
 	return -ENOIOCTLCMD;
 }

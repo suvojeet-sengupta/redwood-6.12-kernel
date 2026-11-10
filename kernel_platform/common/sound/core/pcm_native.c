@@ -3446,6 +3446,9 @@ static int snd_pcm_common_ioctl(struct file *file,
 	case SNDRV_PCM_IOCTL_FORWARD:
 		return snd_pcm_forward_ioctl(substream, arg);
 	}
+	/* Qualcomm's listen (LSM) ioctls, used by the soundtrigger HAL */
+	if (_IOC_TYPE(cmd) == 'U' && substream->ops->ioctl)
+		return substream->ops->ioctl(substream, cmd, (void __force *)arg);
 	pcm_dbg(substream->pcm, "unknown ioctl = 0x%x\n", cmd);
 	return -ENOTTY;
 }
