@@ -969,7 +969,12 @@ static enum power_supply_property wls_props[] = {
 	POWER_SUPPLY_PROP_CURRENT_NOW,
 	POWER_SUPPLY_PROP_CURRENT_MAX,
 	POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,
-	POWER_SUPPLY_PROP_TEMP,
+	/*
+	 * No POWER_SUPPLY_PROP_TEMP: redwood has no wireless charger, the
+	 * ADSP answers it with no data, and the thermal zone the power supply
+	 * core makes for it was disabled at boot with "Unable to get
+	 * temperature". Keep the supply for its sysfs attributes only.
+	 */
 };
 
 static const struct power_supply_desc wls_psy_desc = {
