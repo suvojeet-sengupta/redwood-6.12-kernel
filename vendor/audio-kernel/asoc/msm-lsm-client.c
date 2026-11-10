@@ -2112,7 +2112,7 @@ static int msm_lsm_ioctl_compat(struct snd_pcm_substream *substream,
 	int err = 0;
 	u32 size = 0;
 
-	if (PCM_RUNTIME_CHECK(substream))
+	if (!substream || !substream->runtime)
 		return -ENXIO;
 
 	if (!substream || !substream->private_data) {
@@ -2418,7 +2418,7 @@ static int msm_lsm_ioctl_compat(struct snd_pcm_substream *substream,
 
 		if (p_data.data_size != expected_size) {
 			dev_err(rtd->dev,
-				"%s: %s: Invalid size %d, expected_size %d\n",
+				"%s: %s: Invalid size %d, expected_size %zu\n",
 				__func__, "SET_MODULE_PARAMS(_V2)_32",
 				p_data.data_size, expected_size);
 			err = -EINVAL;
